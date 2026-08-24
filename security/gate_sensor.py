@@ -1,0 +1,62 @@
+# security/gate_sensor.py
+"""Independent continuous Gate security worker."""
+
+import random
+import time
+from security.alert_system import send_alert, send_clear_status
+from security.alarm import set_layer_status
+
+gate_name = "Main Gate"
+gate_layer = "Layer 1 - Gate"
+scan_interval = 15  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
+
+
+def check_motion():
+    return random.choice([0, 0, 0, 0, 0, 1])
+
+
+def check_gate_status():
+    return random.choice(["closed", "closed", "closed", "closed", "closed", "open"])
+
+
+def scan_gate():
+    gate_breach = False
+    breach_reason = ""
+
+    motion = check_motion()
+    if motion == 1:
+        send_alert(gate_layer, gate_name, "movement detected")
+        gate_breach = True
+        breach_reason = f"Unauthorised motion detected at {gate_name}"
+    else:
+        send_clear_status(gate_name + " - no movement")
+
+    gate = check_gate_status()
+    if gate == "open":
+        send_alert(gate_layer, gate_name, "gate opened unexpectedly")
+        gate_breach = True
+        breach_reason = "Gate opened without authorisation"
+    else:
+        send_clear_status(gate_name + " - gate is closed")
+
+    set_layer_status(
+        "gate",
+        gate_breach,
+        breach_reason,
+        state_updates={"gate_status": "BREACH" if gate_breach else "SECURE", "motion_detected": bool(motion)},
+    )
+
+
+def monitor_gate(stop_event=None):
+    print("------------------------------------------")
+    print(" Layer 1, Gate Sensor - CONTINUOUS WORKER")
+    print("------------------------------------------")
+    while stop_event is None or not stop_event.is_set():
+        try:
+            scan_gate()
+        except Exception as e:
+            print(f"  ⚠️ Gate worker error: {e}")
+        if stop_event:
+            stop_event.wait(scan_interval)
+        else:
+            time.sleep(scan_interval)

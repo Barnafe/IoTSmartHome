@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Incident #{{ event.id }}</title>
+<style>
+body{font-family:Arial;background:#0b1220;color:#e8eef7;margin:0}.wrap{max-width:850px;margin:auto;padding:30px}
+.card{background:#121d30;border:1px solid #243652;border-radius:12px;padding:24px}
+.row{display:grid;grid-template-columns:180px 1fr;border-bottom:1px solid #243652;padding:12px 0}
+pre{white-space:pre-wrap;background:#09101c;padding:15px;border-radius:8px}
+a{color:#7cc7ff}
+</style></head><body><div class="wrap">
+<a href="{{ url_for('history') }}">← History</a><h1>Incident / Event #{{ event.id }}</h1>
+<div class="card">
+<div class="row"><b>Time</b><span>{{ event.created_at }}</span></div>
+<div class="row"><b>Event</b><span>{{ event.event_type }}</span></div>
+<div class="row"><b>Severity</b><span>{{ event.severity }}</span></div>
+<div class="row"><b>Source</b><span>{{ event.source }}</span></div>
+<div class="row"><b>Location</b><span>{{ event.location or "—" }}</span></div>
+<div class="row"><b>Message</b><span>{{ event.message }}</span></div>
+<div class="row"><b>Snapshot</b><span>{{ event.snapshot_path or "No physical image attached to this simulation event." }}</span></div>
+<h3>Event Metadata</h3><pre>{{ event.metadata }}</pre>
+</div></div></body></html>

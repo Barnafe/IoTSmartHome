@@ -1,0 +1,6 @@
+flask
+requests
+python-dotenv
+gunicorn
+pytest
+psycopg[binary]>=3.2,<4

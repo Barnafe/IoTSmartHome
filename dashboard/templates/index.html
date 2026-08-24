@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a2e;
+            color: white;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 { text-align: center; color: #e94560; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #aaa; margin-bottom: 10px; font-size: 14px; }
+        .last-updated { text-align: center; color: #555; font-size: 12px; margin-bottom: 20px; }
+
+        .flash {
+            max-width: 900px;
+            margin: 0 auto 20px auto;
+            background-color: #0f3460;
+            border: 1px solid #2E75B6;
+            border-radius: 8px;
+            padding: 12px 20px;
+            text-align: center;
+            font-size: 14px;
+            color: #9fd3ff;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .card {
+            background-color: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #0f3460;
+        }
+        .card h3 { color: #e94560; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; }
+        .card .value { font-size: 24px; font-weight: bold; margin-bottom: 5px; line-height: 1.3; }
+        .card .status { font-size: 13px; color: #aaa; }
+
+        .on { color: #00ff88; }
+        .off { color: #ff4444; }
+        .normal { color: #00ff88; }
+        .high { color: #ff4444; }
+        .low { color: #ffaa00; }
+        .secure { color: #00ff88; }
+        .breach { color: #ff4444; }
+        .safe { color: #00ff88; }
+        .dangerous { color: #ff4444; }
+        .clear { color: #00ff88; }
+        .muted-tag { color: #ffaa00; }
+
+        .alarm-on {
+            background-color: #3d0000;
+            border: 1px solid #ff0000;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0% { border-color: #ff0000; }
+            50% { border-color: #3d0000; }
+            100% { border-color: #ff0000; }
+        }
+
+        .control-panel {
+            max-width: 900px;
+            margin: 30px auto 0 auto;
+            background-color: #16213e;
+            border-radius: 10px;
+            padding: 20px;
+            border: 1px solid #0f3460;
+        }
+        .control-panel h3 {
+            color: #e94560;
+            text-align: center;
+            margin-top: 0;
+            font-size: 14px;
+            text-transform: uppercase;
+        }
+        .control-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .control-buttons form { margin: 0; }
+        .control-buttons button {
+            background-color: #0f3460;
+            color: white;
+            border: 1px solid #2E75B6;
+            border-radius: 6px;
+            padding: 10px 16px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .control-buttons button:hover { background-color: #2E75B6; }
+        .control-buttons button.danger { border-color: #ff4444; }
+        .control-buttons button.danger:hover { background-color: #ff4444; }
+        .control-note {
+            text-align: center;
+            color: #666;
+            font-size: 11px;
+            margin-top: 12px;
+        }
+
+        .footer { text-align: center; margin-top: 30px; color: #555; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+    <h1>🏠 Smart Home Dashboard</h1>
+<p style="text-align:center"><a href="{{ url_for('history') }}" style="color:#7cc7ff">📚 History</a></p>
+    <p class="subtitle">IoT-Based Smart Home Automation System</p>
+    <p class="last-updated" id="last-updated">
+        Last updated: {{ data.last_updated }} | Live updates enabled<br>
+        Monitoring worker: <strong>{{ data.worker_status }}</strong> |
+        Heartbeat: {{ data.worker_heartbeat }}
+    </p>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="flash">ℹ️ {{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="grid">
+
+        <div id="alarm-card" class="card {% if data.alarm_active %}alarm-on{% endif %}">
+            <h3>🚨 Alarm Status</h3>
+            <div id="alarm-value" class="value {{ 'off' if data.alarm_active else 'on' }}">
+                {{ 'TRIGGERED' if data.alarm_active else 'ALL CLEAR' }}
+            </div>
+            <div id="alarm-details" class="status">
+                {% if data.alarm_active %}
+                    {{ data.last_detection }}
+                {% else %}
+                    Gate, Door &amp; Gas layers combined
+                {% endif %}
+                {% if data.alarm_active and data.siren_muted %}
+                    <br><span class="muted-tag">🔇 Siren manually silenced</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>🚪 Gate Status</h3>
+            <div id="gate-value" class="value {{ 'secure' if data.gate_status == 'SECURE' else 'breach' }}">
+                {{ data.gate_status }}
+            </div>
+            <div class="status">Layer 1 - Gate sensor</div>
+        </div>
+
+        <div class="card">
+            <h3>🚪 Door Status</h3>
+            <div id="door-value" class="value {{ 'secure' if data.door_status == 'ALL CLOSED' else 'breach' }}">
+                {{ data.door_status }}
+            </div>
+            <div class="status">Layer 2 - Door sensors</div>
+        </div>
+
+        <div class="card">
+            <h3>📷 Camera Status</h3>
+            <div id="camera-value" class="value {{ 'breach' if 'Unauthorised' in data.camera_status else 'clear' }}">
+                {{ data.camera_status }}
+            </div>
+            <div id="camera-status" class="status">{{ data.camera_last_seen }}</div>
+        </div>
+
+        <div class="card">
+            <h3>🌡️ Temperature</h3>
+            <div id="temp-value" class="value {{ data.temp_status | lower }}">
+                {{ data.temperature }}°C
+            </div>
+            <div id="temp-status" class="status">Status: {{ data.temp_status }} (AC/Heater auto-respond)</div>
+        </div>
+
+        <div class="card">
+            <h3>💨 Gas Level</h3>
+            <div id="gas-value" class="value {{ 'safe' if data.gas_status == 'SAFE' else 'dangerous' }}">
+                {{ data.gas_level }}%
+            </div>
+            <div id="gas-status" class="status">Status: {{ data.gas_status }}</div>
+        </div>
+
+        <div class="card">
+            <h3>🏠 Occupancy</h3>
+            <div id="occupancy-value" class="value {{ 'on' if data.someone_home else 'off' }}">
+                {{ 'SOMEONE HOME' if data.someone_home else 'EMPTY' }}
+            </div>
+            <div class="status">PIR motion detection</div>
+        </div>
+
+        <div class="card">
+            <h3>💡 Lights</h3>
+            <div id="light-value" class="value {{ 'on' if data.light_status == 'ON' else 'off' }}">
+                {{ data.light_status }}
+            </div>
+            <div id="light-status" class="status">{{ data.light_reason }}</div>
+        </div>
+
+        <div class="card">
+            <h3>❄️ AC / 🔥 Heater</h3>
+            <div id="ac-value" class="value {{ 'on' if data.ac_status == 'ON' else 'off' }}">
+                AC: {{ data.ac_status }}
+            </div>
+            <div id="heater-value" class="status {{ 'on' if data.heater_status == 'ON' else 'off' }}">
+                Heater: {{ data.heater_status }}
+            </div>
+        </div>
+
+    </div>
+
+    <div class="control-panel">
+        <h3>🎛️ Homeowner Controls</h3>
+        <div class="control-buttons">
+            <form action="{{ url_for('control_silence') }}" method="POST">
+                <button type="submit">🔇 Silence Siren</button>
+            </form>
+            <form action="{{ url_for('control_off') }}" method="POST">
+                <button type="submit" class="danger">🖐️ Force All Appliances OFF</button>
+            </form>
+            <form action="{{ url_for('control_resume') }}" method="POST">
+                <button type="submit">🔄 Resume Automatic Mode</button>
+            </form>
+            <form action="{{ url_for('control_test_email') }}" method="POST">
+                <button type="submit">📧 Send Test Email</button>
+            </form>
+        </div>
+        <p class="control-note">
+            Current mode:
+            {% if data.override_mode == 'all_off' %}
+                Manual override (all appliances forced off)
+            {% else %}
+                Automatic
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="footer">
+        <p>Smart Home Automation System | By: Tavershima Aondoalough Barnabas</p>
+    </div>
+
+<script>
+(function () {
+    const alarmCard = document.getElementById("alarm-card");
+    const alarmValue = document.getElementById("alarm-value");
+    const alarmDetails = document.getElementById("alarm-details");
+    const gateValue = document.getElementById("gate-value");
+    const doorValue = document.getElementById("door-value");
+    const gasValue = document.getElementById("gas-value");
+    const gasStatus = document.getElementById("gas-status");
+    const tempValue = document.getElementById("temp-value");
+    const tempStatus = document.getElementById("temp-status");
+    const acValue = document.getElementById("ac-value");
+    const heaterValue = document.getElementById("heater-value");
+    const cameraValue = document.getElementById("camera-value");
+    const cameraStatus = document.getElementById("camera-status");
+    const occupancyValue = document.getElementById("occupancy-value");
+    const lightValue = document.getElementById("light-value");
+    const lightStatus = document.getElementById("light-status");
+    const updated = document.getElementById("last-updated");
+
+    function setClass(el, remove, add) {
+        if (!el) return;
+        remove.forEach(c => el.classList.remove(c));
+        if (add) el.classList.add(add);
+    }
+
+    async function refreshLiveState() {
+        try {
+            const response = await fetch("{{ url_for('api_state') }}", {cache: "no-store"});
+            if (!response.ok) return;
+            const d = await response.json();
+
+            const active = !!d.alarm_active;
+            alarmCard.classList.toggle("alarm-on", active);
+            alarmValue.textContent = active ? "TRIGGERED" : "ALL CLEAR";
+            setClass(alarmValue, ["on", "off"], active ? "off" : "on");
+
+            const layers = Array.isArray(d.alarm_layers) ? d.alarm_layers : [];
+            alarmDetails.innerHTML = active
+                ? ((d.last_detection || "Active breach") +
+                   (d.siren_muted ? '<br><span class="muted-tag">🔇 Siren manually silenced</span>' : ""))
+                : "Gate, Door &amp; Gas layers combined";
+
+            gateValue.textContent = d.gate_status || "SECURE";
+            setClass(gateValue, ["secure", "breach"], d.gate_status === "SECURE" ? "secure" : "breach");
+
+            doorValue.textContent = d.door_status || "ALL CLOSED";
+            setClass(doorValue, ["secure", "breach"], d.door_status === "ALL CLOSED" ? "secure" : "breach");
+
+            gasValue.textContent = String(d.gas_level ?? 0) + "%";
+            setClass(gasValue, ["safe", "dangerous"], d.gas_status === "SAFE" ? "safe" : "dangerous");
+            gasStatus.textContent = "Status: " + (d.gas_status || "SAFE");
+
+            tempValue.textContent = String(d.temperature ?? 0) + "°C";
+            setClass(tempValue, ["normal", "high", "low"], String(d.temp_status || "NORMAL").toLowerCase());
+            tempStatus.textContent = "Status: " + (d.temp_status || "NORMAL") + " (AC/Heater auto-respond)";
+
+            acValue.textContent = "AC: " + (d.ac_status || "OFF");
+            setClass(acValue, ["on", "off"], d.ac_status === "ON" ? "on" : "off");
+            heaterValue.textContent = "Heater: " + (d.heater_status || "OFF");
+            setClass(heaterValue, ["on", "off"], d.heater_status === "ON" ? "on" : "off");
+
+            const cameraBreach = String(d.camera_status || "").includes("Unauthorised");
+            cameraValue.textContent = d.camera_status || "CLEAR";
+            setClass(cameraValue, ["breach", "clear"], cameraBreach ? "breach" : "clear");
+            cameraStatus.textContent = d.camera_last_seen || "No person detected";
+
+            occupancyValue.textContent = d.someone_home ? "SOMEONE HOME" : "EMPTY";
+            setClass(occupancyValue, ["on", "off"], d.someone_home ? "on" : "off");
+
+            lightValue.textContent = d.light_status || "OFF";
+            setClass(lightValue, ["on", "off"], d.light_status === "ON" ? "on" : "off");
+            lightStatus.textContent = d.light_reason || "";
+
+            updated.innerHTML = "Last updated: " + (d.last_updated || "waiting...") + " | Live updates enabled<br>" +
+                "Monitoring worker: <strong>" + (d.worker_status || "OFFLINE") + "</strong> | Heartbeat: " + (d.worker_heartbeat || "waiting...");
+        } catch (error) {
+            // A temporary dashboard/API failure must not affect the security worker.
+        }
+    }
+
+    refreshLiveState();
+    setInterval(refreshLiveState, 2000);
+})();
+</script>
+
+</body>
+</html>
