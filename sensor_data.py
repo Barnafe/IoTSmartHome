@@ -111,6 +111,31 @@ def _reconcile_climate_appliances(state):
     return merged
 
 
+def _reconcile_lights(state):
+    """Keep the LIGHTS card from contradicting the OCCUPANCY card in between
+    the energy worker's own scan cycles.
+
+    Occupancy (PIR) and the lights worker run as two independent workers on
+    their own timers, so occupancy can flip several seconds before the
+    lights worker's next scan re-reads it. This does not guess a brightness
+    ON/OFF result - that decision still belongs entirely to the energy
+    worker's own scan_energy() - it only ever fixes the empty-house case
+    (immediate, no reading needed) and clears a now-stale "no one is home"
+    reason so the two cards stop disagreeing while a fresh scan is pending.
+    """
+    merged = dict(state) if isinstance(state, dict) else {}
+    if merged.get("override_mode") == "all_off":
+        return merged  # the override branch in scan_energy() already owns this text
+
+    if not bool(merged.get("someone_home", True)):
+        merged["light_status"] = "OFF"
+        merged["light_reason"] = "No one is home — energy saving mode (lights off)"
+    elif str(merged.get("light_reason", "")).startswith("No one is home"):
+        merged["light_reason"] = "Someone just arrived — checking light levels..."
+
+    return merged
+
+
 def update_temperature_state(temperature, temp_status):
     """Publish temperature and appliance response as one atomic state change."""
     with _lock:
@@ -144,6 +169,7 @@ def update_occupancy_state(someone_home):
             merged = dict(current) if isinstance(current, dict) else {}
             merged["someone_home"] = bool(someone_home)
             merged = _reconcile_climate_appliances(merged)
+            merged = _reconcile_lights(merged)
             merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
             return merged
 
@@ -154,6 +180,7 @@ def update_occupancy_state(someone_home):
         except Exception as exc:
             _state["someone_home"] = bool(someone_home)
             _state.update(_reconcile_climate_appliances(_state))
+            _state.update(_reconcile_lights(_state))
             _state["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
             print(f"  ⚠️ Shared live-state persistence unavailable: {exc}")
         _save_local_cache()
@@ -174,6 +201,8 @@ def update_multiple(updates):
                 "someone_home", "temp_status", "temperature", "override_mode"
             )):
                 merged = _reconcile_climate_appliances(merged)
+            if "someone_home" in updates or "override_mode" in updates:
+                merged = _reconcile_lights(merged)
             merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
             return merged
 

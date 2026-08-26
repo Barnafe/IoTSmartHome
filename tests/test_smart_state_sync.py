@@ -149,6 +149,42 @@ def test_camera_is_not_an_alarm_feeding_layer():
     assert "global alarm" not in source.lower()
 
 
+def test_lights_card_never_shows_stale_empty_house_reason_after_occupancy_returns():
+    """Occupancy (PIR) and the lights worker run on independent timers, so
+    occupancy can flip several seconds before the lights worker's next scan
+    re-reads it. The LIGHTS card must never keep saying "No one is home"
+    once OCCUPANCY already says someone is home."""
+    database, old_db = _isolated_db()
+    try:
+        import sensor_data
+        sensor_data.reset_data()
+
+        # House goes empty: lights immediately reflect that, same as before.
+        sensor_data.update_occupancy_state(False)
+        state = sensor_data.read_data()
+        assert state["someone_home"] is False
+        assert state["light_status"] == "OFF"
+        assert state["light_reason"].startswith("No one is home")
+
+        # Someone arrives - simulate the energy worker not having rescanned
+        # brightness yet (its own 15s timer hasn't fired). The occupancy
+        # update alone must already stop the light card from contradicting
+        # the occupancy card, without needing to know the real brightness.
+        sensor_data.update_occupancy_state(True)
+        state = sensor_data.read_data()
+        assert state["someone_home"] is True
+        assert not state["light_reason"].startswith("No one is home")
+
+        # A manual all-off override still wins and is left to the energy
+        # worker's own override branch, unchanged by this reconciliation.
+        sensor_data.set_override("all_off")
+        sensor_data.update_occupancy_state(False)
+        state = sensor_data.read_data()
+        assert state["override_mode"] == "all_off"
+    finally:
+        database.DB_PATH = old_db
+
+
 def test_climate_decision_always_uses_occupancy_first_then_weather():
     """Rapid source changes must never leave the AC/heater derived state stale."""
     database, old_db = _isolated_db()
