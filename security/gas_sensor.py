@@ -7,7 +7,7 @@ from security.alert_system import send_alert, send_clear_status
 from security.alarm import set_layer_status
 
 gas_layer = "Gas Leakage Detection"
-scan_interval = 15  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
+scan_interval = 5  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
 safe_gas_level = 30
 
 

@@ -346,18 +346,30 @@ def get_event(event_id):
 
 
 def get_stats():
+    """Return History statistics using backend-independent named columns.
+
+    PostgreSQL connections use psycopg's ``dict_row`` factory, so
+    ``fetchone()`` returns a mapping rather than a positional tuple. SQLite
+    uses ``sqlite3.Row`` here, which also supports named-column access. Using
+    explicit aliases keeps this function correct on both backends.
+    """
     init_db()
     with _connect() as conn:
-        total = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+        total = conn.execute(
+            "SELECT COUNT(*) AS total FROM events"
+        ).fetchone()["total"]
         critical = conn.execute(
-            "SELECT COUNT(*) FROM events WHERE severity IN ('critical','danger')"
-        ).fetchone()[0]
+            "SELECT COUNT(*) AS critical FROM events "
+            "WHERE severity IN ('critical','danger')"
+        ).fetchone()["critical"]
         warnings = conn.execute(
-            "SELECT COUNT(*) FROM events WHERE severity='warning'"
-        ).fetchone()[0]
+            "SELECT COUNT(*) AS warnings FROM events "
+            "WHERE severity='warning'"
+        ).fetchone()["warnings"]
         incidents = conn.execute(
-            "SELECT COUNT(*) FROM events WHERE event_type='security_breach'"
-        ).fetchone()[0]
+            "SELECT COUNT(*) AS incidents FROM events "
+            "WHERE event_type='security_breach'"
+        ).fetchone()["incidents"]
     return {"total": total, "critical": critical, "warnings": warnings,
             "incidents": incidents}
 

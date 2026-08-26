@@ -72,10 +72,19 @@ def _save():
 
 
 def _temperature_appliance_outputs(temp_status, someone_home, override_mode):
-    """Derive AC/heater state from the SAME current shared state transition."""
-    status = str(temp_status or "normal").lower()
-    if override_mode == "all_off" or not someone_home:
+    """Return the only valid automatic AC/heater decision.
+
+    Occupancy is the first and highest-priority condition. Weather/temperature
+    is considered only when someone is home. This function is deliberately
+    pure so every state transition uses exactly the same decision table.
+    """
+    status = str(temp_status or "normal").strip().lower()
+
+    # Manual all-off always wins, and an empty house always has appliances off.
+    if override_mode == "all_off" or not bool(someone_home):
         return "OFF", "OFF"
+
+    # Someone is home: temperature/weather decides which appliance, if any.
     if status == "high":
         return "ON", "OFF"
     if status == "low":
@@ -83,22 +92,35 @@ def _temperature_appliance_outputs(temp_status, someone_home, override_mode):
     return "OFF", "OFF"
 
 
+def _reconcile_climate_appliances(state):
+    """Synchronise ONLY the derived AC/heater outputs with source state.
+
+    Occupancy and temperature are the source conditions. AC/heater is derived
+    state and must never become an independent decision-maker. Keeping this
+    reconciliation in one helper prevents one update path from accidentally
+    leaving the appliance card stale.
+    """
+    merged = dict(state) if isinstance(state, dict) else {}
+    ac, heater = _temperature_appliance_outputs(
+        merged.get("temp_status", "normal"),
+        bool(merged.get("someone_home", True)),
+        merged.get("override_mode"),
+    )
+    merged["ac_status"] = ac
+    merged["heater_status"] = heater
+    return merged
+
+
 def update_temperature_state(temperature, temp_status):
     """Publish temperature and appliance response as one atomic state change."""
     with _lock:
         def _merge(current):
             merged = dict(current) if isinstance(current, dict) else {}
-            override = merged.get("override_mode")
-            someone_home = bool(merged.get("someone_home", True))
-            ac, heater = _temperature_appliance_outputs(
-                temp_status, someone_home, override
-            )
             merged.update({
                 "temperature": temperature,
                 "temp_status": str(temp_status).upper(),
-                "ac_status": ac,
-                "heater_status": heater,
             })
+            merged = _reconcile_climate_appliances(merged)
             merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
             return merged
 
@@ -108,10 +130,7 @@ def update_temperature_state(temperature, temp_status):
             _state.update(new_state)
         except Exception as exc:
             _state.update({"temperature": temperature, "temp_status": str(temp_status).upper()})
-            ac, heater = _temperature_appliance_outputs(
-                temp_status, bool(_state.get("someone_home", True)), _state.get("override_mode")
-            )
-            _state.update({"ac_status": ac, "heater_status": heater})
+            _state.update(_reconcile_climate_appliances(_state))
             _state["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
             print(f"  ⚠️ Shared live-state persistence unavailable: {exc}")
         _save_local_cache()
@@ -123,16 +142,8 @@ def update_occupancy_state(someone_home):
     with _lock:
         def _merge(current):
             merged = dict(current) if isinstance(current, dict) else {}
-            ac, heater = _temperature_appliance_outputs(
-                merged.get("temp_status", "normal"),
-                bool(someone_home),
-                merged.get("override_mode"),
-            )
-            merged.update({
-                "someone_home": bool(someone_home),
-                "ac_status": ac,
-                "heater_status": heater,
-            })
+            merged["someone_home"] = bool(someone_home)
+            merged = _reconcile_climate_appliances(merged)
             merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
             return merged
 
@@ -142,10 +153,7 @@ def update_occupancy_state(someone_home):
             _state.update(new_state)
         except Exception as exc:
             _state["someone_home"] = bool(someone_home)
-            ac, heater = _temperature_appliance_outputs(
-                _state.get("temp_status", "normal"), someone_home, _state.get("override_mode")
-            )
-            _state.update({"ac_status": ac, "heater_status": heater})
+            _state.update(_reconcile_climate_appliances(_state))
             _state["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
             print(f"  ⚠️ Shared live-state persistence unavailable: {exc}")
         _save_local_cache()
@@ -160,6 +168,12 @@ def update_multiple(updates):
         def _merge(current):
             merged = dict(current) if isinstance(current, dict) else {}
             merged.update(updates)
+            # Climate is derived state. If any generic caller changes one of
+            # its source conditions, update AC/heater in this SAME transaction.
+            if any(key in updates for key in (
+                "someone_home", "temp_status", "temperature", "override_mode"
+            )):
+                merged = _reconcile_climate_appliances(merged)
             merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
             return merged
 
@@ -227,12 +241,7 @@ def set_override(mode):
         def _merge(current):
             merged = dict(current) if isinstance(current, dict) else {}
             merged["override_mode"] = mode
-            ac, heater = _temperature_appliance_outputs(
-                merged.get("temp_status", "normal"),
-                bool(merged.get("someone_home", True)),
-                mode,
-            )
-            merged.update({"ac_status": ac, "heater_status": heater})
+            merged = _reconcile_climate_appliances(merged)
             merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
             return merged
         try:
@@ -240,10 +249,7 @@ def set_override(mode):
             _state.clear(); _state.update(new_state)
         except Exception as exc:
             _state["override_mode"] = mode
-            ac, heater = _temperature_appliance_outputs(
-                _state.get("temp_status", "normal"), bool(_state.get("someone_home", True)), mode
-            )
-            _state.update({"ac_status": ac, "heater_status": heater})
+            _state.update(_reconcile_climate_appliances(_state))
             _state["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
             print(f"  ⚠️ Shared live-state persistence unavailable: {exc}")
         _save_local_cache()

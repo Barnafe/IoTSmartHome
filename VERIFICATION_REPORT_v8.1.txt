@@ -1,0 +1,36 @@
+SmartHome v8.1 — History/PostgreSQL Compatibility Verification
+===============================================================
+
+ROOT CAUSE FIXED
+The deployed History page failed with:
+    KeyError: 0
+
+The failing code was:
+    conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
+
+On PostgreSQL/Neon the application uses psycopg's dict_row factory, so
+fetchone() returns a mapping rather than a positional tuple. The History
+statistics code now uses named columns and works consistently with SQLite
+and PostgreSQL/Neon.
+
+REGRESSION PROTECTION
+Added a regression test simulating PostgreSQL-style dictionary rows and
+verifying get_stats() returns the expected values.
+
+FINAL TEST RESULT
+[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m                                                   [100%][0m
+[32m[32m[1m22 passed[0m[32m in 0.65s[0m[0m
+Return code: 0
+
+SYNTAX CHECK
+Python files checked: 22
+Syntax errors: 0
+
+DEPLOYMENT
+Web Service command:
+    gunicorn dashboard.app:app
+
+Monitoring Worker:
+    python worker.py
+
+No database reset or deletion is required for this fix.

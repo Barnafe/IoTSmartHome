@@ -33,19 +33,9 @@ init_db()
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key-change-in-production")
 
-# Start the monitoring engine in a background thread so the free Render
-# Web Service can run both the dashboard and the simulation engine.
-import threading
-from worker import main as worker_main
-
-def start_worker():
-    try:
-        worker_main()
-    except Exception as exc:
-        print(f"Background worker stopped: {exc}")
-
-_worker_thread = threading.Thread(target=start_worker, daemon=True)
-_worker_thread.start()
+# The continuous monitoring engine is intentionally NOT started here.
+# Render runs it in the separate Background Worker service. The web service
+# remains responsible for dashboard/API requests and homeowner controls.
 
 # ---- routes ----
 

@@ -1,6 +1,6 @@
 SMART HOME FINAL VERIFICATION REPORT
 ====================================
-Version: SmartHome v6 - Tasks 1-4
+Version: SmartHome v2 baseline - PostgreSQL History compatibility fix
 Date: 2026-08-22
 
 PHASES COMPLETED
@@ -20,13 +20,11 @@ PHASES COMPLETED
 
 AUTOMATED TESTS
 ---------------
-pytest run #1: 19 passed
-pytest run #2: 19 passed
-pytest run #3: 19 passed
+pytest regression suite: 27 passed
 
 SYNTAX
 ------
-21 Python files parsed with Python AST validation.
+22 Python files parsed with Python AST validation.
 0 syntax errors found.
 
 ARCHITECTURE CHECKS
@@ -63,3 +61,31 @@ Regression suite: PASS (19/19)
 Python syntax: PASS (21/21 files)
 Camera alarm behavior preserved: PASS
 Ready for Render configuration and live Neon verification: YES
+
+
+LATEST FIX - HISTORY 500 / KeyError: 0
+---------------------------------------
+Root cause: database.py get_stats() used fetchone()[0]. The application configures
+psycopg with dict_row for PostgreSQL/Neon, so PostgreSQL returns named fields and
+row[0] raises KeyError: 0.
+
+Fix: get_stats() now uses explicit SQL aliases and named-column access for total,
+critical, warnings and incidents. This is compatible with both PostgreSQL/Neon
+and SQLite (sqlite3.Row). A regression test now simulates PostgreSQL dict_row
+responses and verifies all four statistics.
+
+LATEST VERIFICATION
+-------------------
+- 27/27 automated tests passed.
+- 22/22 Python files passed AST syntax validation.
+- PostgreSQL dict-row regression for get_stats() passed.
+- No database reset or migration is required for this fix.
+- Existing Render commands remain unchanged: dashboard web service uses
+  `gunicorn dashboard.app:app`; the monitoring worker uses `python worker.py`.
+
+ENVIRONMENT LIMITATION
+----------------------
+The isolated build environment does not have Flask/Gunicorn installed and cannot
+reach the package index, so a live Flask browser smoke test could not be executed
+here. The application source is syntax-checked and the full available regression
+suite passes.

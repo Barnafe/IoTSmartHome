@@ -31,7 +31,7 @@ command is all you need locally — no second terminal required.
 python -m pytest -q
 ```
 
-Currently 26/26 passing.
+Current verification: 27/27 passing.
 
 ## Deploying it (Render)
 

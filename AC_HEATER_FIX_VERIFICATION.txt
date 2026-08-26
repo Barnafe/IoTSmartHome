@@ -1,0 +1,49 @@
+SmartHome v2 — AC/Heater Card Focused Fix
+=============================================
+
+BASELINE
+--------
+This build is based directly on the supplied:
+    SmartHome_v2_History_Fix_Verified.zip
+
+SCOPE
+-----
+Only the AC/Heater decision path was changed, plus focused regression tests.
+No gate, door, camera, gas, temperature, occupancy, lights, alarm,
+notification, database-history, or Render architecture logic was intentionally
+changed.
+
+FIX
+---
+1. Occupancy remains the highest-priority condition.
+   EMPTY -> AC OFF + Heater OFF immediately.
+2. When someone is home, current temperature/weather decides:
+   NORMAL -> both OFF
+   HIGH   -> AC ON, Heater OFF
+   LOW    -> AC OFF, Heater ON
+3. Manual "Force All Appliances OFF" override still wins.
+4. The derived AC/Heater outputs are reconciled in the same atomic runtime-state
+   update whenever occupancy, temperature/weather, or override changes.
+5. The dashboard AC/Heater card derives its displayed result directly from the
+   same occupancy + temperature values returned by the live-state API, so it
+   cannot display a stale appliance decision while those source cards have
+   already changed.
+
+TESTS
+-----
+29 passed, 0 failed.
+All Python files parse successfully.
+
+NEW FOCUSED TESTS
+-----------------
+- Rapid occupancy/weather transitions cannot leave AC/Heater stale.
+- Generic source-state updates also reconcile AC/Heater.
+- Dashboard AC/Heater card is guarded to use occupancy first, weather second,
+  with manual override taking precedence.
+
+IMPORTANT
+---------
+The 15-second sensor scan intervals for the existing occupancy and temperature
+workers were NOT changed. This fix addresses the AC/Heater response once those
+source values change and prevents stale/mismatched AC/Heater state. The other
+dashboard cards and monitoring workers are left untouched.

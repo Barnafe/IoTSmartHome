@@ -8,7 +8,7 @@ from security.alarm import set_layer_status
 
 doors = ["Front Door", "Back Door"]
 door_layer = "Layer 2 - Doors"
-scan_interval = 15  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
+scan_interval = 5  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
 
 
 def check_door_motion():

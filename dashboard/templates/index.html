@@ -306,10 +306,29 @@
             setClass(tempValue, ["normal", "high", "low"], String(d.temp_status || "NORMAL").toLowerCase());
             tempStatus.textContent = "Status: " + (d.temp_status || "NORMAL") + " (AC/Heater auto-respond)";
 
-            acValue.textContent = "AC: " + (d.ac_status || "OFF");
-            setClass(acValue, ["on", "off"], d.ac_status === "ON" ? "on" : "off");
-            heaterValue.textContent = "Heater: " + (d.heater_status || "OFF");
-            setClass(heaterValue, ["on", "off"], d.heater_status === "ON" ? "on" : "off");
+            // AC/heater is a DERIVED card. Its display follows the two
+            // authoritative source cards in this same API response:
+            // occupancy first, then temperature/weather. This prevents the
+            // appliance card from ever showing a stale decision while the
+            // source cards have already changed.
+            const home = !!d.someone_home;
+            const weather = String(d.temp_status || "NORMAL").trim().toLowerCase();
+            const forcedOff = d.override_mode === "all_off";
+            let desiredAc = "OFF";
+            let desiredHeater = "OFF";
+
+            if (home && !forcedOff) {
+                if (weather === "high") {
+                    desiredAc = "ON";
+                } else if (weather === "low") {
+                    desiredHeater = "ON";
+                }
+            }
+
+            acValue.textContent = "AC: " + desiredAc;
+            setClass(acValue, ["on", "off"], desiredAc === "ON" ? "on" : "off");
+            heaterValue.textContent = "Heater: " + desiredHeater;
+            setClass(heaterValue, ["on", "off"], desiredHeater === "ON" ? "on" : "off");
 
             const cameraBreach = String(d.camera_status || "").includes("Unauthorised");
             cameraValue.textContent = d.camera_status || "CLEAR";

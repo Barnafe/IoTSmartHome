@@ -1,21 +1,26 @@
-# Virtual environment
-venv/
-.venv/
-
-# Environment variables / secrets
+# Never commit real secrets
 .env
 
-# Python cache
+# Python
 __pycache__/
-*.py[cod]
+*.pyc
+*.pyo
+.Python
+venv/
+env/
+*.egg-info/
 
-# Test/cache files
-.pytest_cache/
-
-# Database files if local
-*.db
-*.sqlite3
-
-# OS files
+# OS/editor junk
 .DS_Store
+.vscode/settings.json
 Thumbs.db
+
+# Runtime persistence
+/data/
+*.db
+*.db-shm
+*.db-wal
+.env
+
+# Local SQLite database (production uses Neon PostgreSQL)
+data/*.db

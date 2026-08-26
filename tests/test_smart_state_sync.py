@@ -147,3 +147,65 @@ def test_camera_is_not_an_alarm_feeding_layer():
     source = Path(__file__).resolve().parents[1].joinpath("security", "camera.py").read_text(encoding="utf-8")
     assert "set_layer_status" not in source
     assert "global alarm" not in source.lower()
+
+
+def test_climate_decision_always_uses_occupancy_first_then_weather():
+    """Rapid source changes must never leave the AC/heater derived state stale."""
+    database, old_db = _isolated_db()
+    try:
+        import sensor_data
+        sensor_data.reset_data()
+
+        # Empty house always wins, even in extreme weather.
+        sensor_data.update_temperature_state(45, "high")
+        sensor_data.update_occupancy_state(False)
+        state = sensor_data.read_data()
+        assert state["someone_home"] is False
+        assert state["temp_status"] == "HIGH"
+        assert state["ac_status"] == "OFF"
+        assert state["heater_status"] == "OFF"
+
+        # Occupancy changes to home: current weather is evaluated immediately.
+        sensor_data.update_occupancy_state(True)
+        state = sensor_data.read_data()
+        assert state["ac_status"] == "ON"
+        assert state["heater_status"] == "OFF"
+
+        # Weather changes while occupied: switch immediately to the new choice.
+        sensor_data.update_temperature_state(15, "low")
+        state = sensor_data.read_data()
+        assert state["ac_status"] == "OFF"
+        assert state["heater_status"] == "ON"
+
+        # Normal weather while occupied: both off.
+        sensor_data.update_temperature_state(25, "normal")
+        state = sensor_data.read_data()
+        assert state["ac_status"] == "OFF"
+        assert state["heater_status"] == "OFF"
+
+        # Generic state updates use the same reconciliation path.
+        sensor_data.update_multiple({"someone_home": False})
+        state = sensor_data.read_data()
+        assert state["ac_status"] == "OFF"
+        assert state["heater_status"] == "OFF"
+
+        sensor_data.update_multiple({"someone_home": True, "temp_status": "HIGH"})
+        state = sensor_data.read_data()
+        assert state["ac_status"] == "ON"
+        assert state["heater_status"] == "OFF"
+    finally:
+        database.DB_PATH = old_db
+
+
+def test_dashboard_ac_card_is_derived_from_occupancy_and_weather():
+    """Guard the UI rule: occupancy first, weather second, manual override wins."""
+    from pathlib import Path
+    html = Path(__file__).resolve().parents[1].joinpath(
+        "dashboard", "templates", "index.html"
+    ).read_text(encoding="utf-8")
+    assert 'const home = !!d.someone_home;' in html
+    assert 'const weather = String(d.temp_status || "NORMAL").trim().toLowerCase();' in html
+    assert 'const forcedOff = d.override_mode === "all_off";' in html
+    assert 'if (home && !forcedOff)' in html
+    assert 'weather === "high"' in html
+    assert 'weather === "low"' in html

@@ -70,7 +70,15 @@ def test_postgres_sql_path_with_driver_stub(monkeypatch):
                 self.next_id += 1
                 return Result([row])
             if "count(*)" in normalized:
-                return Result([(1,)])
+                if "as total" in normalized:
+                    return Result([{"total": 4}])
+                if "as critical" in normalized:
+                    return Result([{"critical": 2}])
+                if "as warnings" in normalized:
+                    return Result([{"warnings": 1}])
+                if "as incidents" in normalized:
+                    return Result([{"incidents": 1}])
+                return Result([{"count": 1}])
             if normalized.startswith("select * from events"):
                 return Result([])
             if normalized.startswith("select id,created_at"):
@@ -103,6 +111,15 @@ def test_postgres_sql_path_with_driver_stub(monkeypatch):
     assert event_id == 1
     assert any("INSERT INTO events" in sql for sql, _ in fake_connection.statements)
     assert any("%s" in sql for sql, _ in fake_connection.statements)
+
+    # Regression check for the deployed Neon/PostgreSQL failure:
+    # psycopg's dict_row returns named fields, not row[0].
+    assert database.get_stats() == {
+        "total": 4,
+        "critical": 2,
+        "warnings": 1,
+        "incidents": 1,
+    }
 
 
 def test_retention_policy_is_configurable(monkeypatch):
