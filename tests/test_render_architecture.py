@@ -57,3 +57,23 @@ def test_live_state_has_worker_health_fields():
     import sensor_data
     assert sensor_data.default_data["worker_status"] == "OFFLINE"
     assert "worker_heartbeat" in sensor_data.default_data
+
+
+def test_embedded_worker_toggle_reads_env(monkeypatch):
+    """Render's free plan has no separate Background Worker service, so the
+    web process must be able to run the same worker.main() itself - but stay
+    off once a real separate worker service exists, so the engine never runs
+    twice. Set EMBEDDED_WORKER=false BEFORE the only import of dashboard.app
+    in this suite, so no real background thread ever starts during tests."""
+    monkeypatch.setenv("EMBEDDED_WORKER", "false")
+    monkeypatch.setenv("FLASK_SECRET_KEY", "test-secret")
+    import dashboard.app as dashboard_app
+
+    assert dashboard_app._embedded_worker_enabled() is False
+    assert dashboard_app._embedded_worker_started is False
+
+    monkeypatch.setenv("EMBEDDED_WORKER", "true")
+    assert dashboard_app._embedded_worker_enabled() is True
+
+    monkeypatch.delenv("EMBEDDED_WORKER", raising=False)
+    assert dashboard_app._embedded_worker_enabled() is True  # default: on

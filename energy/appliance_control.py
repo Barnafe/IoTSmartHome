@@ -11,7 +11,7 @@ from sensor_data import update_multiple, get_override, read_data
 from database import log_event
 
 min_brightness = 30
-scan_interval = 5  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
+scan_interval = 15  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
 
 # tracks whether we've already logged the CURRENT override episode,
 # so leaving "Force All Appliances OFF" active doesn't write a fresh

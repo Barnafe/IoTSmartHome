@@ -1,26 +1,8 @@
-# Never commit real secrets
+# Local dev artifacts - never deploy these. Render's disk is ephemeral and
+# per-service anyway, so a committed data/ folder just ships stale state
+# that looks "real" and hides whether the live database is actually working.
+data/
 .env
-
-# Python
 __pycache__/
 *.pyc
-*.pyo
-.Python
-venv/
-env/
-*.egg-info/
-
-# OS/editor junk
-.DS_Store
-.vscode/settings.json
-Thumbs.db
-
-# Runtime persistence
-/data/
-*.db
-*.db-shm
-*.db-wal
-.env
-
-# Local SQLite database (production uses Neon PostgreSQL)
-data/*.db
+.pytest_cache/

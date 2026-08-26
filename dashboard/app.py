@@ -1,10 +1,21 @@
 # dashboard/app.py
 #
-# Web-service entry point for the Smart Home dashboard. Continuous monitoring
-# is deliberately hosted by worker.py as a separate Render Background Worker.
+# Web-service entry point for the Smart Home dashboard.
+#
+# Continuous monitoring can run in either of two shapes:
+#  - SPLIT (Render paid plans): worker.py runs as its own Background Worker
+#    service; this file never touches the engine at all.
+#  - EMBEDDED (Render free plan - no Background Worker service available):
+#    this file starts the exact same worker.main() as a background thread
+#    inside the one web process, so a single free Web Service is enough.
+#    Controlled by the EMBEDDED_WORKER env var (default: on). Set it to
+#    "false" once you have a real separate worker service, so the two never
+#    run the engine at the same time.
 #
 import os
 import sys
+import threading
+from datetime import datetime
 from flask import Flask, render_template, redirect, url_for, flash, request, Response
 
 # make sure the SmartHome project root (one level up from this
@@ -24,7 +35,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from sensor_data import read_data, set_override, clear_override
-from database import init_db, get_events, get_event, get_stats, clear_history
+from database import init_db, get_events, get_event, get_stats, clear_history, get_backend
 from security.alarm import mute_siren
 from notify import notification_manager
 
@@ -33,15 +44,92 @@ init_db()
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key-change-in-production")
 
-# The continuous monitoring engine is intentionally NOT started here.
-# Render runs it in the separate Background Worker service. The web service
-# remains responsible for dashboard/API requests and homeowner controls.
+# ---- embedded worker (free-tier single-service mode) ----
+#
+# Render's free plan doesn't offer a Background Worker service, so
+# worker.py can never run as its own process there. Without this, the
+# monitoring engine simply never starts in production - the dashboard boots
+# fine and looks healthy, but nothing ever updates it, which is exactly the
+# "everything is frozen" symptom. Gated by an env var (default on) so a
+# future paid split-service setup can turn it off cleanly instead of running
+# the engine twice.
+_embedded_worker_started = False
+_embedded_worker_lock = threading.Lock()
+
+
+def _embedded_worker_enabled():
+    flag = os.environ.get("EMBEDDED_WORKER", "true").strip().lower()
+    return flag not in ("false", "0", "no", "off")
+
+
+def _start_embedded_worker_once():
+    global _embedded_worker_started
+    with _embedded_worker_lock:
+        if _embedded_worker_started:
+            return
+        _embedded_worker_started = True
+
+    def _run():
+        try:
+            from worker import main as worker_main
+            worker_main()
+        except Exception as exc:
+            print(f"  ❌ Embedded monitoring worker stopped: {exc}")
+
+    threading.Thread(target=_run, name="SmartHome-Embedded-Worker", daemon=True).start()
+    print("  🧵 Embedded monitoring worker started inside the web process "
+          "(EMBEDDED_WORKER=true - single-service mode).")
+
+
+# Never auto-start under pytest (nothing currently imports this module in
+# tests, but this keeps a stray future import from spawning a real
+# background thread during test collection) and only when explicitly enabled.
+if not os.environ.get("PYTEST_CURRENT_TEST") and _embedded_worker_enabled():
+    _start_embedded_worker_once()
+
+# If the worker hasn't refreshed its heartbeat within this window, the web
+# service stops trusting the last stored "ONLINE" value and displays the
+# worker as offline instead - otherwise a dead/never-started worker process
+# looks identical to a healthy one that just updated a moment ago.
+STALE_HEARTBEAT_SECONDS = 30
+
+
+def _augment_diagnostics(data):
+    """View-layer only: never written back to the shared state.
+
+    Two things this project has already been bitten by:
+    1. A worker that silently stopped updating still showed "ONLINE"
+       forever, because the dashboard only ever displayed whatever
+       worker_status was last written - it never checked *when*.
+    2. On Render, the web and worker run as two separate processes on two
+       separate machines. If DATABASE_URL (Postgres/Neon) isn't configured
+       identically for both, each one silently falls back to its own local
+       SQLite file - both keep running with no errors, but the web service
+       can never see the worker's updates. That failure is invisible unless
+       the active backend is surfaced somewhere.
+    """
+    data = dict(data)
+
+    heartbeat = data.get("worker_heartbeat")
+    stale = True
+    if heartbeat and heartbeat != "waiting...":
+        try:
+            hb_time = datetime.strptime(heartbeat, "%Y-%m-%d %H:%M:%S")
+            stale = (datetime.now() - hb_time).total_seconds() > STALE_HEARTBEAT_SECONDS
+        except ValueError:
+            stale = True
+    if stale:
+        data["worker_status"] = "OFFLINE (stale heartbeat)"
+
+    data["db_backend"] = get_backend()
+    return data
+
 
 # ---- routes ----
 
 @app.route("/")
 def dashboard():
-    data = read_data()
+    data = _augment_diagnostics(read_data())
     # The worker publishes the authoritative live alarm/siren state to the
     # shared runtime-state row; read_data() already contains the latest value.
     return render_template("index.html", data=data)
@@ -50,7 +138,7 @@ def dashboard():
 @app.route("/api/state")
 def api_state():
     """Return the authoritative shared live state for real-time dashboard updates."""
-    return read_data()
+    return _augment_diagnostics(read_data())
 
 @app.route("/history")
 def history():

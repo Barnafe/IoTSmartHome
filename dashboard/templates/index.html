@@ -121,7 +121,7 @@
     <p class="last-updated" id="last-updated">
         Last updated: {{ data.last_updated }} | Live updates enabled<br>
         Monitoring worker: <strong>{{ data.worker_status }}</strong> |
-        Heartbeat: {{ data.worker_heartbeat }}
+        Heartbeat: {{ data.worker_heartbeat }} | Storage: {{ data.db_backend }}
     </p>
 
     {% with messages = get_flashed_messages() %}
@@ -343,7 +343,8 @@
             lightStatus.textContent = d.light_reason || "";
 
             updated.innerHTML = "Last updated: " + (d.last_updated || "waiting...") + " | Live updates enabled<br>" +
-                "Monitoring worker: <strong>" + (d.worker_status || "OFFLINE") + "</strong> | Heartbeat: " + (d.worker_heartbeat || "waiting...");
+                "Monitoring worker: <strong>" + (d.worker_status || "OFFLINE") + "</strong> | Heartbeat: " + (d.worker_heartbeat || "waiting...") +
+                " | Storage: " + (d.db_backend || "?");
         } catch (error) {
             // A temporary dashboard/API failure must not affect the security worker.
         }

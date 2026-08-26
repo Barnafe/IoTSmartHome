@@ -7,7 +7,7 @@ from security.alert_system import send_alert, send_clear_status
 from sensor_data import update_temperature_state
 
 temp_layer = "Temperature & Fire Detection"
-scan_interval = 5  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
+scan_interval = 15  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
 min_temp = 18
 max_temp = 35
 

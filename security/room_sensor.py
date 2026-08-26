@@ -8,7 +8,7 @@ from sensor_data import update_occupancy_state
 
 rooms = ["Living Room", "Bedroom", "Kitchen", "Garage"]
 room_layer = "Layer 3 - Indoor Rooms"
-scan_interval = 5  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
+scan_interval = 15  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
 
 
 def check_room_motion():

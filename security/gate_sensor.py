@@ -8,7 +8,7 @@ from security.alarm import set_layer_status
 
 gate_name = "Main Gate"
 gate_layer = "Layer 1 - Gate"
-scan_interval = 5  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
+scan_interval = 15  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
 
 
 def check_motion():

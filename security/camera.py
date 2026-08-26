@@ -13,7 +13,7 @@ from database import log_event
 
 cameras = ["Main Gate Camera", "Front Door Camera", "Backyard Camera"]
 camera_layer = "Layer 1 - Camera Surveillance"
-scan_interval = 5  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
+scan_interval = 15  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
 
 
 def detect_person():
