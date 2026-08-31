@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Home Dashboard</title>
     <style>
+        * { box-sizing: border-box; }
         body {
             font-family: Arial, sans-serif;
             background-color: #1a1a2e;
             color: white;
             margin: 0;
             padding: 20px;
+            width: 100%;
+            overflow-x: hidden;
         }
         h1 { text-align: center; color: #e94560; margin-bottom: 5px; }
         .subtitle { text-align: center; color: #aaa; margin-bottom: 10px; font-size: 14px; }
@@ -18,6 +21,7 @@
 
         .flash {
             max-width: 900px;
+            width: 100%;
             margin: 0 auto 20px auto;
             background-color: #0f3460;
             border: 1px solid #2E75B6;
@@ -33,6 +37,7 @@
             grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             max-width: 900px;
+            width: 100%;
             margin: 0 auto;
         }
         .card {
@@ -71,6 +76,7 @@
 
         .control-panel {
             max-width: 900px;
+            width: 100%;
             margin: 30px auto 0 auto;
             background-color: #16213e;
             border-radius: 10px;
@@ -111,6 +117,26 @@
         }
 
         .footer { text-align: center; margin-top: 30px; color: #555; font-size: 12px; }
+
+        /* Mobile responsiveness: cards were locked to a rigid 3-column grid,
+           which overflowed the viewport on phones and forced the user to
+           zoom out and lose the centered PC layout. These breakpoints
+           reflow the same cards/markup into 2 then 1 column as the screen
+           narrows - no HTML structure, wording, or JS logic is touched. */
+        @media (max-width: 760px) {
+            .grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+        }
+        @media (max-width: 480px) {
+            body { padding: 12px; }
+            .grid { grid-template-columns: 1fr; gap: 12px; }
+            .card { padding: 16px; }
+            .card .value { font-size: 20px; }
+            .control-panel { padding: 16px; }
+            .control-buttons { flex-direction: column; }
+            .control-buttons form,
+            .control-buttons button { width: 100%; }
+            h1 { font-size: 22px; }
+        }
     </style>
 </head>
 <body>
@@ -275,6 +301,69 @@
         if (add) el.classList.add(add);
     }
 
+    // --- Siren sound ("pim-pim") -------------------------------------
+    // Purely a front-end audio effect layered on top of the alarm-blinking
+    // behaviour that already exists. It does not change alarm_active,
+    // siren_muted, or any other state - it only reads the same two fields
+    // the page already used to render the red-light blink and the
+    // "Siren manually silenced" tag, and uses a tiny generated beep
+    // (Web Audio API oscillator) so no external sound file is needed.
+    let audioCtx = null;
+    let sirenTimer = null;
+
+    function getAudioCtx() {
+        if (!audioCtx) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (Ctx) audioCtx = new Ctx();
+        }
+        return audioCtx;
+    }
+
+    // Browsers block audio until a user gesture. Unlock/resume on the
+    // first click or touch anywhere on the page.
+    function unlockAudio() {
+        const ctx = getAudioCtx();
+        if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+    }
+    document.addEventListener("click", unlockAudio, { once: true });
+    document.addEventListener("touchstart", unlockAudio, { once: true });
+
+    function playBeep(startOffset, freq) {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "square";
+        osc.frequency.value = freq;
+        const t0 = ctx.currentTime + startOffset;
+        const dur = 0.12;
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.linearRampToValueAtTime(0.15, t0 + 0.01);
+        gain.gain.linearRampToValueAtTime(0, t0 + dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.02);
+    }
+
+    function playPimPim() {
+        const ctx = getAudioCtx();
+        if (!ctx || ctx.state === "suspended") return; // no user gesture yet - stay silent, blinking still works
+        playBeep(0, 1000);     // "pim"
+        playBeep(0.18, 1000);  // "pim"
+    }
+
+    function setSirenSounding(shouldSound) {
+        if (shouldSound && !sirenTimer) {
+            playPimPim();
+            sirenTimer = setInterval(playPimPim, 1000);
+        } else if (!shouldSound && sirenTimer) {
+            clearInterval(sirenTimer);
+            sirenTimer = null;
+        }
+    }
+    // -------------------------------------------------------------------
+
     async function refreshLiveState() {
         try {
             const response = await fetch("{{ url_for('api_state') }}", {cache: "no-store"});
@@ -285,6 +374,10 @@
             alarmCard.classList.toggle("alarm-on", active);
             alarmValue.textContent = active ? "TRIGGERED" : "ALL CLEAR";
             setClass(alarmValue, ["on", "off"], active ? "off" : "on");
+            // Sound follows the same two fields the blinking red light and
+            // the "Siren manually silenced" tag already use - triggered
+            // while active, silenced when the homeowner mutes it.
+            setSirenSounding(active && !d.siren_muted);
 
             const layers = Array.isArray(d.alarm_layers) ? d.alarm_layers : [];
             alarmDetails.innerHTML = active

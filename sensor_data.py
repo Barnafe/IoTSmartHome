@@ -117,11 +117,17 @@ def _reconcile_lights(state):
 
     Occupancy (PIR) and the lights worker run as two independent workers on
     their own timers, so occupancy can flip several seconds before the
-    lights worker's next scan re-reads it. This does not guess a brightness
-    ON/OFF result - that decision still belongs entirely to the energy
-    worker's own scan_energy() - it only ever fixes the empty-house case
-    (immediate, no reading needed) and clears a now-stale "no one is home"
-    reason so the two cards stop disagreeing while a fresh scan is pending.
+    lights worker's next scan re-reads it. It fixes the empty-house case
+    immediately (no reading needed), and - rather than leaving a stale
+    "no one is home" reason up on screen with a placeholder "checking..."
+    message until the energy worker's next scheduled scan (up to
+    `scan_interval` seconds away) - takes one immediate brightness reading
+    right now, using the exact same decision function the energy worker
+    itself uses (control_lights/read_brightness in
+    energy.appliance_control), so the LIGHTS card shows its real ON/OFF
+    result straight away instead of a placeholder. The energy worker's own
+    next scheduled scan still runs as normal afterwards and simply confirms
+    or refreshes this reading - nothing about its own timer or logic changes.
     """
     merged = dict(state) if isinstance(state, dict) else {}
     if merged.get("override_mode") == "all_off":
@@ -131,7 +137,12 @@ def _reconcile_lights(state):
         merged["light_status"] = "OFF"
         merged["light_reason"] = "No one is home — energy saving mode (lights off)"
     elif str(merged.get("light_reason", "")).startswith("No one is home"):
-        merged["light_reason"] = "Someone just arrived — checking light levels..."
+        # Imported here (not at module top) to avoid a circular import,
+        # since energy.appliance_control itself imports from sensor_data.
+        from energy.appliance_control import read_brightness, control_lights
+        light_status, light_reason = control_lights(read_brightness())
+        merged["light_status"] = light_status
+        merged["light_reason"] = light_reason
 
     return merged
 
