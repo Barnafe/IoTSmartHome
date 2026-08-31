@@ -118,24 +118,38 @@
 
         .footer { text-align: center; margin-top: 30px; color: #555; font-size: 12px; }
 
-        /* Mobile responsiveness: cards were locked to a rigid 3-column grid,
-           which overflowed the viewport on phones and forced the user to
-           zoom out and lose the centered PC layout. These breakpoints
-           reflow the same cards/markup into 2 then 1 column as the screen
-           narrows - no HTML structure, wording, or JS logic is touched. */
+        /* Mobile responsiveness: keep the SAME 3-column layout as PC on
+           phones too (not fewer columns) so related cards - e.g. Occupancy
+           next to Lights, Temperature near AC/Heater - stay visible
+           together instead of being scattered across separate scrolled
+           screens. Text/padding/gaps shrink as the screen narrows so the
+           3-column grid still fits without horizontal overflow. No card
+           order, wording, or JS logic is touched - purely sizing. */
         @media (max-width: 760px) {
-            .grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+            .grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+            .card { padding: 10px; }
+            .card h3 { font-size: 10px; margin-bottom: 5px; }
+            .card .value { font-size: 14px; line-height: 1.2; margin-bottom: 4px; }
+            .card .status { font-size: 9px; }
+            body { padding: 10px; }
+            h1 { font-size: 20px; }
+            .subtitle { font-size: 12px; }
+            .last-updated { font-size: 10px; }
         }
         @media (max-width: 480px) {
-            body { padding: 12px; }
-            .grid { grid-template-columns: 1fr; gap: 12px; }
-            .card { padding: 16px; }
-            .card .value { font-size: 20px; }
-            .control-panel { padding: 16px; }
+            body { padding: 8px; }
+            .grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+            .card { padding: 6px; }
+            .card h3 { font-size: 8px; margin-bottom: 3px; }
+            .card .value { font-size: 11px; line-height: 1.15; margin-bottom: 2px; }
+            .card .status { font-size: 7px; }
+            .control-panel { padding: 12px; }
             .control-buttons { flex-direction: column; }
             .control-buttons form,
             .control-buttons button { width: 100%; }
-            h1 { font-size: 22px; }
+            h1 { font-size: 17px; }
+            .subtitle { font-size: 10px; }
+            .last-updated { font-size: 9px; }
         }
     </style>
 </head>
