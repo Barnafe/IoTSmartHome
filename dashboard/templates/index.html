@@ -262,7 +262,7 @@
     <div class="control-panel">
         <h3>🎛️ Homeowner Controls</h3>
         <div class="control-buttons">
-            <form action="{{ url_for('control_silence') }}" method="POST">
+            <form id="silence-form" action="{{ url_for('control_silence') }}" method="POST">
                 <button type="submit">🔇 Silence Siren</button>
             </form>
             <form action="{{ url_for('control_off') }}" method="POST">
@@ -333,14 +333,50 @@
         return audioCtx;
     }
 
-    // Browsers block audio until a user gesture. Unlock/resume on the
-    // first click or touch anywhere on the page.
+    // Browsers require a real user gesture (tap/click/key) before ANY
+    // audio - including this one - is allowed to play. This is a browser
+    // security policy (Chrome, Safari, Firefox all enforce it the same
+    // way) to stop pages auto-playing sound; no front-end code can bypass
+    // it, so on a completely untouched page load the siren truly cannot
+    // sound before the very first tap - the red-light blink still fires
+    // instantly regardless, with or without a tap.
+    //
+    // What WAS a bug: the old code only ever tried to unlock audio once
+    // (`{ once: true }`) and removed itself even if that attempt silently
+    // failed - which some mobile/in-app browsers do on the very first
+    // try. That's the "sometimes it works, sometimes it doesn't" the user
+    // saw. Fixed by (1) not removing the listener - every tap/click/key
+    // gets a fresh chance until one actually succeeds, (2) playing a real
+    // (inaudible) sound synchronously inside the gesture itself, which is
+    // the standard fix for iOS/Android browsers that report the audio
+    // context as "running" without truly having unlocked output yet, and
+    // (3) firing the siren immediately the instant it unlocks, instead of
+    // waiting up to 1 second for the next scheduled beep.
+    let audioUnlocked = false;
     function unlockAudio() {
+        if (audioUnlocked) return;
         const ctx = getAudioCtx();
-        if (ctx && ctx.state === "suspended") ctx.resume().catch(() => {});
+        if (!ctx) return;
+        try {
+            if (ctx.state === "suspended") ctx.resume().catch(() => {});
+            // A real, near-silent tone committed inside this same gesture -
+            // more reliable across mobile browsers than resume() alone.
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            gain.gain.value = 0.0001;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.05);
+        } catch (err) { /* try again on the next gesture */ }
+        if (ctx.state !== "suspended") {
+            audioUnlocked = true;
+            if (sirenTimer) playPimPim(); // don't make them wait for the next tick
+        }
     }
-    document.addEventListener("click", unlockAudio, { once: true });
-    document.addEventListener("touchstart", unlockAudio, { once: true });
+    ["click", "touchstart", "pointerdown", "keydown"].forEach(evt =>
+        document.addEventListener(evt, unlockAudio)
+    );
 
     function playBeep(startOffset, freq) {
         const ctx = getAudioCtx();
@@ -456,6 +492,46 @@
             // A temporary dashboard/API failure must not affect the security worker.
         }
     }
+
+    // --- Instant Silence Siren (no full-page reload) --------------------
+    // Only this one button is changed, since it's the one that needs to
+    // work fast on a weak connection. It still calls the exact same
+    // /control/silence endpoint and the exact same mute_siren() logic on
+    // the server - nothing server-side changes. It just avoids reloading
+    // the whole page (HTML/CSS/JS) for a control that only flips one
+    // field, then immediately re-polls the small JSON state instead of
+    // waiting for the next scheduled 2-second refresh. If the network
+    // request itself fails or times out, it fails quietly - the regular
+    // 2-second refresh will still pick up the real state as soon as the
+    // connection is back, and no page reload was wasted trying.
+    const silenceForm = document.getElementById("silence-form");
+    if (silenceForm) {
+        silenceForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const btn = silenceForm.querySelector("button");
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = "🔇 Silencing...";
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+            try {
+                await fetch(silenceForm.action, {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: { "X-Requested-With": "fetch" },
+                    signal: controller.signal
+                });
+            } catch (err) {
+                // Weak/lost network - stay quiet, next automatic refresh recovers.
+            } finally {
+                clearTimeout(timeout);
+                btn.disabled = false;
+                btn.textContent = originalText;
+                refreshLiveState();
+            }
+        });
+    }
+    // ---------------------------------------------------------------------
 
     refreshLiveState();
     setInterval(refreshLiveState, 2000);
