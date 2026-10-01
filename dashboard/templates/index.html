@@ -116,6 +116,35 @@
             margin-top: 12px;
         }
 
+
+        /* Climate switch: one button, press once -> OFF / AC / HEATER pop up */
+        .climate-wrap { position: relative; }
+        .climate-wrap > button { border-color: #ffaa00; }
+        .climate-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 50%;
+            transform: translateX(-50%);
+            min-width: 190px;
+            background-color: #16213e;
+            border: 1px solid #2E75B6;
+            border-radius: 8px;
+            padding: 6px;
+            z-index: 50;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.5);
+        }
+        .climate-menu.open { display: block; }
+        .climate-menu button {
+            display: block;
+            width: 100%;
+            text-align: left;
+            margin: 2px 0;
+        }
+        .climate-menu button.active { background-color: #2E75B6; border-color: #9fd3ff; }
+        .climate-menu hr { border: 0; border-top: 1px solid #0f3460; margin: 6px 0; }
+        .manual-tag { color: #ffaa00; }
+
         .footer { text-align: center; margin-top: 30px; color: #555; font-size: 12px; }
 
         /* Mobile responsiveness: keep the SAME 3-column layout as PC on
@@ -146,7 +175,9 @@
             .control-panel { padding: 12px; }
             .control-buttons { flex-direction: column; }
             .control-buttons form,
+            .control-buttons .climate-wrap,
             .control-buttons button { width: 100%; }
+            .climate-menu { left: 0; right: 0; transform: none; min-width: 0; }
             h1 { font-size: 17px; }
             .subtitle { font-size: 10px; }
             .last-updated { font-size: 9px; }
@@ -255,6 +286,11 @@
             <div id="heater-value" class="status {{ 'on' if data.heater_status == 'ON' else 'off' }}">
                 Heater: {{ data.heater_status }}
             </div>
+            <div id="climate-tag" class="status manual-tag">
+                {% if data.override_mode != 'all_off' and data.climate_mode in ('AC', 'HEATER', 'OFF') %}
+                    🎚️ Manual: {{ data.climate_mode }}
+                {% endif %}
+            </div>
         </div>
 
     </div>
@@ -265,6 +301,16 @@
             <form id="silence-form" action="{{ url_for('control_silence') }}" method="POST">
                 <button type="submit">🔇 Silence Siren</button>
             </form>
+            <div class="climate-wrap" id="climate-wrap">
+                <button type="button" id="climate-toggle" aria-haspopup="true" aria-expanded="false">🌡️ Climate Switch ▾</button>
+                <div class="climate-menu" id="climate-menu" role="menu">
+                    <button type="button" data-mode="OFF" role="menuitem">⛔ OFF</button>
+                    <button type="button" data-mode="AC" role="menuitem">❄️ AC</button>
+                    <button type="button" data-mode="HEATER" role="menuitem">🔥 HEATER</button>
+                    <hr>
+                    <button type="button" data-mode="AUTO" role="menuitem">🔄 Auto (weather decides)</button>
+                </div>
+            </div>
             <form action="{{ url_for('control_off') }}" method="POST">
                 <button type="submit" class="danger">🖐️ Force All Appliances OFF</button>
             </form>
@@ -277,11 +323,22 @@
         </div>
         <p class="control-note">
             Current mode:
+            <span id="mode-note">
             {% if data.override_mode == 'all_off' %}
                 Manual override (all appliances forced off)
             {% else %}
                 Automatic
             {% endif %}
+            </span>
+            <br>
+            Climate switch:
+            <span id="climate-note">
+            {% if data.climate_mode in ('AC', 'HEATER', 'OFF') %}
+                Manual - {{ data.climate_mode }}
+            {% else %}
+                Auto (weather decides)
+            {% endif %}
+            </span>
         </p>
     </div>
 
@@ -414,7 +471,11 @@
     }
     // -------------------------------------------------------------------
 
+    let climateBusy = false;      // a climate-switch request is in flight
+    let lastForcedOff = false;    // last known Force-OFF state from the server
+
     async function refreshLiveState() {
+        if (climateBusy) return;  // don't let a stale poll flicker over the tap
         try {
             const response = await fetch("{{ url_for('api_state') }}", {cache: "no-store"});
             if (!response.ok) return;
@@ -457,16 +518,27 @@
             const home = !!d.someone_home;
             const weather = String(d.temp_status || "NORMAL").trim().toLowerCase();
             const forcedOff = d.override_mode === "all_off";
+            lastForcedOff = forcedOff;
+            const cMode = String(d.climate_mode || "AUTO").toUpperCase();
             let desiredAc = "OFF";
             let desiredHeater = "OFF";
 
-            if (home && !forcedOff) {
-                if (weather === "high") {
+            // Same priority as the server: Force-OFF > homeowner climate
+            // switch (weather and occupancy ignored) > automatic.
+            if (!forcedOff) {
+                if (cMode === "AC") {
                     desiredAc = "ON";
-                } else if (weather === "low") {
+                } else if (cMode === "HEATER") {
                     desiredHeater = "ON";
+                } else if (cMode === "AUTO" && home) {
+                    if (weather === "high") {
+                        desiredAc = "ON";
+                    } else if (weather === "low") {
+                        desiredHeater = "ON";
+                    }
                 }
             }
+            renderClimateMode(cMode, forcedOff);
 
             acValue.textContent = "AC: " + desiredAc;
             setClass(acValue, ["on", "off"], desiredAc === "ON" ? "on" : "off");
@@ -492,6 +564,93 @@
             // A temporary dashboard/API failure must not affect the security worker.
         }
     }
+
+    // --- Climate switch (OFF / AC / HEATER / AUTO) - instant, no reload --
+    // Same pattern as Silence Siren: fetch() POST, then re-poll the small
+    // JSON state straight away. The card is also updated optimistically the
+    // moment the option is tapped, so it responds before the network does;
+    // the real state from the server then confirms or corrects it.
+    const climateWrap = document.getElementById("climate-wrap");
+    const climateToggle = document.getElementById("climate-toggle");
+    const climateMenu = document.getElementById("climate-menu");
+    const climateNote = document.getElementById("climate-note");
+    const climateTag = document.getElementById("climate-tag");
+    const modeNote = document.getElementById("mode-note");
+    const climateLabels = { OFF: "OFF", AC: "AC", HEATER: "HEATER", AUTO: "Auto (weather decides)" };
+
+    function renderClimateMode(mode, forcedOff) {
+        if (climateNote) {
+            climateNote.textContent = (mode === "AUTO") ? climateLabels.AUTO : "Manual - " + mode;
+        }
+        if (climateTag) {
+            climateTag.textContent = (!forcedOff && mode !== "AUTO") ? "🎚️ Manual: " + mode : "";
+        }
+        if (modeNote) {
+            modeNote.textContent = forcedOff ? "Manual override (all appliances forced off)" : "Automatic";
+        }
+        if (climateMenu) {
+            climateMenu.querySelectorAll("button").forEach(b =>
+                b.classList.toggle("active", b.dataset.mode === mode));
+        }
+    }
+
+    function closeClimateMenu() {
+        if (!climateMenu) return;
+        climateMenu.classList.remove("open");
+        climateToggle.setAttribute("aria-expanded", "false");
+    }
+
+    if (climateToggle && climateMenu) {
+        climateToggle.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const open = climateMenu.classList.toggle("open");
+            climateToggle.setAttribute("aria-expanded", open ? "true" : "false");
+        });
+        document.addEventListener("click", (e) => {
+            if (!climateWrap.contains(e.target)) closeClimateMenu();
+        });
+
+        climateMenu.querySelectorAll("button").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const mode = btn.dataset.mode;
+                closeClimateMenu();
+
+                // optimistic, instant card update (server state corrects it next poll)
+                const ac = mode === "AC" ? "ON" : "OFF";
+                const heater = mode === "HEATER" ? "ON" : "OFF";
+                if (mode !== "AUTO" && !lastForcedOff) {
+                    acValue.textContent = "AC: " + ac;
+                    setClass(acValue, ["on", "off"], ac === "ON" ? "on" : "off");
+                    heaterValue.textContent = "Heater: " + heater;
+                    setClass(heaterValue, ["on", "off"], heater === "ON" ? "on" : "off");
+                }
+                renderClimateMode(mode, lastForcedOff);
+
+                climateBusy = true;
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 8000);
+                try {
+                    await fetch("{{ url_for('control_climate') }}", {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: {
+                            "X-Requested-With": "fetch",
+                            "Content-Type": "application/x-www-form-urlencoded"
+                        },
+                        body: "mode=" + encodeURIComponent(mode),
+                        signal: controller.signal
+                    });
+                } catch (err) {
+                    // weak network - the regular 2s refresh recovers the true state
+                } finally {
+                    clearTimeout(timeout);
+                    climateBusy = false;
+                    refreshLiveState();
+                }
+            });
+        });
+    }
+    // ---------------------------------------------------------------------
 
     // --- Instant Silence Siren (no full-page reload) --------------------
     // Only this one button is changed, since it's the one that needs to

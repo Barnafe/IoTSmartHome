@@ -271,3 +271,10 @@ worker instead of modifying only the web process's private memory.
 Camera surveillance remains intentionally outside the global alarm state
 machine: camera detections are recorded and displayed, but camera detection
 never activates the global alarm or automated incident notification manager.
+
+### Climate switch (v12)
+The dashboard's **🌡️ Climate Switch** button pops up OFF / AC / HEATER (plus "Auto").
+OFF/AC/HEATER are obeyed regardless of weather and occupancy; "Auto" hands control
+back to the normal weather/occupancy logic, which is also the default on every fresh
+start. "Force All Appliances OFF" still overrides everything. The switch uses
+`POST /control/climate` via fetch(), so it responds without reloading the page.

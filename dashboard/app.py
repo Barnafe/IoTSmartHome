@@ -34,8 +34,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
-from sensor_data import read_data, set_override, clear_override
-from database import init_db, get_events, get_event, get_stats, clear_history, get_backend
+from sensor_data import read_data, set_override, clear_override, set_climate_mode, VALID_CLIMATE_MODES
+from database import log_event, init_db, get_events, get_event, get_stats, clear_history, get_backend
 from security.alarm import mute_siren
 from notify import notification_manager
 
@@ -203,6 +203,38 @@ def control_silence():
 def control_off():
     set_override("all_off")
     flash("Manual override activated - all appliances forced OFF.")
+    return redirect(url_for("dashboard"))
+
+@app.route("/control/climate", methods=["POST"])
+def control_climate():
+    """Homeowner climate switch: OFF / AC / HEATER, or AUTO to hand control
+    back to the weather. Works with a fetch() call (instant, JSON reply, no
+    page reload) and still degrades to a normal form post + redirect."""
+    mode = (request.form.get("mode") or "").strip().upper()
+    wants_json = request.headers.get("X-Requested-With") == "fetch"
+    if mode not in VALID_CLIMATE_MODES:
+        if wants_json:
+            return {"ok": False, "error": "Invalid mode"}, 400
+        flash("Invalid climate mode.")
+        return redirect(url_for("dashboard"))
+
+    state = set_climate_mode(mode)
+    messages = {
+        "AC": "Climate switch: AC forced ON (weather ignored).",
+        "HEATER": "Climate switch: Heater forced ON (weather ignored).",
+        "OFF": "Climate switch: AC and Heater both OFF.",
+        "AUTO": "Climate switch: back to automatic (weather decides).",
+    }
+    try:
+        log_event("climate_override", "info", "energy", "Entire House", messages[mode],
+                  metadata={"climate_mode": mode})
+    except Exception as exc:
+        print(f"  ⚠️ Climate switch event log failed: {exc}")
+
+    if wants_json:
+        return {"ok": True, "climate_mode": mode,
+                "ac_status": state.get("ac_status"), "heater_status": state.get("heater_status")}
+    flash(messages[mode])
     return redirect(url_for("dashboard"))
 
 @app.route("/control/resume", methods=["POST"])

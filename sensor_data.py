@@ -30,6 +30,7 @@ default_data = {
     "alarm_active": False,
     "siren_muted": False,
     "override_mode": None,
+    "climate_mode": "AUTO",
     "last_updated": "waiting...",
     "worker_status": "OFFLINE",
     "worker_heartbeat": "waiting..."
@@ -71,20 +72,36 @@ def _save():
 
 
 
-def _temperature_appliance_outputs(temp_status, someone_home, override_mode):
-    """Return the only valid automatic AC/heater decision.
+VALID_CLIMATE_MODES = ("AUTO", "OFF", "AC", "HEATER")
 
-    Occupancy is the first and highest-priority condition. Weather/temperature
-    is considered only when someone is home. This function is deliberately
-    pure so every state transition uses exactly the same decision table.
+
+def _temperature_appliance_outputs(temp_status, someone_home, override_mode, climate_mode="AUTO"):
+    """Return the only valid AC/heater decision.
+
+    Priority (highest first):
+      1. Manual "Force All Appliances OFF" override -> both OFF.
+      2. Homeowner climate switch (OFF / AC / HEATER) -> obeyed as given,
+         regardless of weather AND occupancy (the homeowner is explicitly
+         commanding it, e.g. a fever on a hot day; a still person may not
+         trigger the PIR sensors).
+      3. AUTO (default): an empty house is OFF; otherwise the weather decides.
+    This function is deliberately pure so every state transition uses exactly
+    the same decision table.
     """
-    status = str(temp_status or "normal").strip().lower()
-
-    # Manual all-off always wins, and an empty house always has appliances off.
-    if override_mode == "all_off" or not bool(someone_home):
+    if override_mode == "all_off":
         return "OFF", "OFF"
 
-    # Someone is home: temperature/weather decides which appliance, if any.
+    mode = str(climate_mode or "AUTO").strip().upper()
+    if mode == "AC":
+        return "ON", "OFF"
+    if mode == "HEATER":
+        return "OFF", "ON"
+    if mode == "OFF":
+        return "OFF", "OFF"
+
+    status = str(temp_status or "normal").strip().lower()
+    if not bool(someone_home):
+        return "OFF", "OFF"
     if status == "high":
         return "ON", "OFF"
     if status == "low":
@@ -105,6 +122,7 @@ def _reconcile_climate_appliances(state):
         merged.get("temp_status", "normal"),
         bool(merged.get("someone_home", True)),
         merged.get("override_mode"),
+        merged.get("climate_mode", "AUTO"),
     )
     merged["ac_status"] = ac
     merged["heater_status"] = heater
@@ -209,7 +227,8 @@ def update_multiple(updates):
             # Climate is derived state. If any generic caller changes one of
             # its source conditions, update AC/heater in this SAME transaction.
             if any(key in updates for key in (
-                "someone_home", "temp_status", "temperature", "override_mode"
+                "someone_home", "temp_status", "temperature", "override_mode",
+                "climate_mode"
             )):
                 merged = _reconcile_climate_appliances(merged)
             if "someone_home" in updates or "override_mode" in updates:
@@ -297,6 +316,33 @@ def set_override(mode):
 
 def clear_override():
     set_override(None)
+
+
+def set_climate_mode(mode):
+    """Homeowner climate switch: AUTO / OFF / AC / HEATER.
+
+    Changes the mode and re-derives AC/heater in the SAME atomic state update,
+    so the dashboard sees the new result on its very next poll."""
+    mode = str(mode or "AUTO").strip().upper()
+    if mode not in VALID_CLIMATE_MODES:
+        raise ValueError(f"Invalid climate mode: {mode}")
+    with _lock:
+        def _merge(current):
+            merged = dict(current) if isinstance(current, dict) else {}
+            merged["climate_mode"] = mode
+            merged = _reconcile_climate_appliances(merged)
+            merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            return merged
+        try:
+            new_state = update_runtime_state(_merge)
+            _state.clear(); _state.update(new_state)
+        except Exception as exc:
+            _state["climate_mode"] = mode
+            _state.update(_reconcile_climate_appliances(_state))
+            _state["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            print(f"  ⚠️ Shared live-state persistence unavailable: {exc}")
+        _save_local_cache()
+        return dict(_state)
 
 
 def get_override():

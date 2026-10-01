@@ -242,6 +242,8 @@ def test_dashboard_ac_card_is_derived_from_occupancy_and_weather():
     assert 'const home = !!d.someone_home;' in html
     assert 'const weather = String(d.temp_status || "NORMAL").trim().toLowerCase();' in html
     assert 'const forcedOff = d.override_mode === "all_off";' in html
-    assert 'if (home && !forcedOff)' in html
+    # v12: homeowner climate switch sits between Force-OFF and automatic
+    assert 'if (!forcedOff)' in html
+    assert 'cMode === "AUTO" && home' in html
     assert 'weather === "high"' in html
     assert 'weather === "low"' in html

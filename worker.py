@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from database import init_db
-from sensor_data import initialize_runtime_state
+from sensor_data import initialize_runtime_state, set_climate_mode
 from security.alarm import register_notifier, register_clear_notifier, reset_alarm_state
 from notify import send_breach_email, notification_manager
 from engine import run_forever
@@ -18,6 +18,7 @@ from engine import run_forever
 def main():
     init_db()
     initialize_runtime_state()
+    set_climate_mode("AUTO")  # a fresh system start always begins in normal automatic climate control
     reset_alarm_state()
 
     # Only the dedicated worker owns automated incident notifications.
