@@ -3,8 +3,10 @@
 
 import random
 import time
+import wake
 from security.alert_system import send_alert, send_clear_status
-from security.alarm import set_layer_status
+from security.alarm import set_layer_status, monitoring_paused
+from sensor_data import read_data
 
 gate_name = "Main Gate"
 gate_layer = "Layer 1 - Gate"
@@ -20,6 +22,12 @@ def check_gate_status():
 
 
 def scan_gate():
+    if monitoring_paused():
+        return
+    if str(read_data().get("gate_mode", "AUTO")).upper() == "OPEN":
+        # Homeowner opened the gate: authorised, so it is not a breach.
+        set_layer_status("gate", False, state_updates={"gate_status": "OPEN", "motion_detected": False})
+        return
     gate_breach = False
     breach_reason = ""
 
@@ -52,11 +60,9 @@ def monitor_gate(stop_event=None):
     print(" Layer 1, Gate Sensor - CONTINUOUS WORKER")
     print("------------------------------------------")
     while stop_event is None or not stop_event.is_set():
+        _gen = wake.generation()
         try:
             scan_gate()
         except Exception as e:
             print(f"  ⚠️ Gate worker error: {e}")
-        if stop_event:
-            stop_event.wait(scan_interval)
-        else:
-            time.sleep(scan_interval)
+        wake.nap(stop_event, scan_interval, _gen)

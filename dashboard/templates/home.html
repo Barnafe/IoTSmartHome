@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Barnafé Tech Smart Home System</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+<style>
+  body{min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;
+    background:
+      radial-gradient(1200px 600px at 78% 18%, rgba(8,70,150,.45), transparent 60%),
+      radial-gradient(900px 500px at 10% 90%, rgba(0,90,200,.25), transparent 60%),
+      linear-gradient(180deg,#000b1d 0%,#00112a 60%,#000a1a 100%);}
+  .wrap{width:100%;max-width:1400px;margin:0 auto;padding:0 40px}
+
+  /* top bar */
+  .topbar{border-bottom:1px solid rgba(15,120,200,.25);background:rgba(0,12,30,.6);backdrop-filter:blur(6px)}
+  .topbar .wrap{display:flex;align-items:center;justify-content:space-between;height:90px}
+  .topbar .brand-logo{height:76px}
+  .nav{display:flex;align-items:center;gap:40px}
+  .nav .home{display:flex;align-items:center;gap:8px;color:var(--cyan);font-weight:600;text-decoration:none;
+    height:90px;border-bottom:3px solid var(--cyan);padding-top:3px}
+  .nav .home svg{width:22px;height:22px}
+  .tagline-nav{color:#d7ecff;font-size:15px;display:flex;gap:14px;align-items:center}
+  .tagline-nav i{width:5px;height:5px;border-radius:50%;background:#d7ecff;display:inline-block}
+
+  /* hero */
+  .hero{position:relative;flex:0 0 auto;min-height:450px}
+  .hero-img{position:absolute;right:0;top:0;width:min(58%,820px);height:100%;
+    background:url('{{ url_for("static", filename="img/hero.jpg") }}') center/cover no-repeat;
+    -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 38%),linear-gradient(0deg,transparent 0,#000 22%);
+    -webkit-mask-composite:source-in;mask-image:linear-gradient(90deg,transparent 0,#000 38%),linear-gradient(0deg,transparent 0,#000 22%);
+    mask-composite:intersect;}
+  .hero .wrap{position:relative;z-index:2;padding-top:88px;padding-bottom:30px}
+  .hello{font-size:34px;font-weight:300;margin:0 0 4px;color:#f2f8ff}
+  .title1{font-size:clamp(46px,6.2vw,76px);font-weight:800;letter-spacing:-1px;line-height:1.05;margin:0}
+  .title2{font-size:clamp(46px,6.2vw,76px);font-weight:800;letter-spacing:-1px;line-height:1.1;margin:0;
+    background:linear-gradient(90deg,#00e8ff,#0a8cff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .bar{width:85px;height:4px;border-radius:3px;background:var(--cyan);margin:26px 0 28px}
+  .tag{font-size:20px;color:#cfe6fb;margin:0;font-weight:300}
+
+  /* info cards */
+  .cards{position:relative;z-index:3;display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:6px}
+  .card{display:flex;align-items:center;gap:26px;padding:26px 30px;border-radius:18px;text-decoration:none;color:inherit;
+    background:linear-gradient(135deg,rgba(0,40,90,.55),rgba(0,18,45,.75));border:1px solid rgba(20,130,220,.45);
+    box-shadow:0 0 0 1px rgba(0,120,255,.06) inset,0 10px 40px rgba(0,0,0,.35)}
+  .card .ic{flex:0 0 180px;height:150px;border-radius:14px;
+    background-size:cover;background-position:center;
+    -webkit-mask-image:radial-gradient(closest-side,#000 62%,transparent 100%);mask-image:radial-gradient(closest-side,#000 62%,transparent 100%)}
+  .card .sep{align-self:stretch;width:1px;background:rgba(40,140,230,.45);margin:6px 0}
+  .card h3{margin:0 0 8px;font-size:26px;font-weight:700}
+  .card .chips{color:#cfe6fb;font-size:15px;margin-bottom:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .card .chips i{width:4px;height:4px;border-radius:50%;background:#9fd3ff}
+  .card p{margin:0;color:#d4e8fa;font-size:15.5px;line-height:1.55}
+  .guide-card{transition:transform .15s,border-color .15s,box-shadow .15s;cursor:pointer}
+  .guide-card:hover{transform:translateY(-3px);border-color:var(--cyan);box-shadow:0 0 28px rgba(15,219,250,.25)}
+  .guide-card .ic{flex-basis:120px;height:130px}
+  .go{flex:0 0 46px;height:46px;border-radius:50%;background:linear-gradient(135deg,#0aa7e6,#0a6fd0);
+    display:grid;place-items:center;box-shadow:0 0 16px rgba(10,150,230,.6)}
+  .go svg{width:22px;height:22px}
+
+  /* process button */
+  .process{text-align:center;margin:44px 0 0}
+  .pbtn{display:inline-flex;align-items:center;justify-content:center;gap:18px;min-width:390px;height:82px;border-radius:44px;
+    text-decoration:none;color:#fff;font-size:34px;font-weight:700;
+    background:linear-gradient(180deg,#14b8ff 0%,#0877e6 100%);
+    border:1px solid #6fd6ff;box-shadow:0 0 30px rgba(20,170,255,.55),0 0 70px rgba(10,110,230,.35),inset 0 2px 0 rgba(255,255,255,.35);
+    transition:transform .15s,box-shadow .15s}
+  .pbtn:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 0 40px rgba(30,190,255,.8),0 0 90px rgba(10,110,230,.5),inset 0 2px 0 rgba(255,255,255,.4)}
+  .pbtn svg{width:42px;height:42px}
+  .process small{display:block;margin-top:14px;color:#9fd3ff;font-size:16px}
+
+  /* footer */
+  footer{margin-top:auto;padding:30px 0 22px}
+  footer .wrap{display:flex;align-items:center;justify-content:space-between;gap:20px}
+  .brandline{flex:1;display:flex;align-items:center;gap:18px;justify-content:center;color:#5d86b3;letter-spacing:6px;font-size:14px}
+  .brandline:before,.brandline:after{content:"";flex:0 1 230px;height:1px;background:linear-gradient(90deg,transparent,#1b4f87)}
+  .brandline:after{background:linear-gradient(270deg,transparent,#1b4f87)}
+  .ver{color:#d0e6fa;font-size:14px;position:absolute;right:40px}
+  footer .wrap{position:relative}
+
+  @media (max-width:1000px){
+    .wrap{padding:0 22px}
+    .tagline-nav{display:none}
+    .nav{margin-left:auto}
+    .topbar .wrap{height:74px}.topbar .brand-logo{height:50px}.nav .home{height:74px}
+    .hero-img{width:100%;opacity:.45;-webkit-mask-image:linear-gradient(0deg,transparent 0,#000 40%);mask-image:linear-gradient(0deg,transparent 0,#000 40%)}
+    .hero .wrap{padding-top:48px}
+    .hello{font-size:24px}
+    .cards{grid-template-columns:1fr;gap:20px}
+    .card{padding:20px;gap:16px}
+    .card .ic{flex-basis:96px;height:96px}
+    .guide-card .ic{flex-basis:80px;height:90px}
+    .card h3{font-size:21px}
+    .pbtn{min-width:0;width:100%;max-width:360px;height:70px;font-size:28px}
+    .ver{position:static}
+    footer .wrap{flex-direction:column}
+  }
+  @media (max-width:520px){
+    .card{flex-wrap:wrap}.card .sep{display:none}.guide-card{flex-wrap:nowrap}
+    .tag{font-size:16px}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap">
+    <img class="brand-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="Barnafé Tech Services">
+    <nav class="nav">
+      <a class="home" href="{{ url_for('home') }}">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg>Home
+      </a>
+      <div class="tagline-nav"><span>Smarter Home</span><i></i><span>Safer Living</span><i></i><span>Better Tomorrow</span></div>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-img" role="img" aria-label="A smart home at night with connected security, lighting and temperature icons"></div>
+  <div class="wrap">
+    <p class="hello">Hello and Welcome to</p>
+    <h1 class="title1">Barnafé Tech</h1>
+    <h1 class="title2">Smart Home System</h1>
+    <div class="bar"></div>
+    <p class="tag">Advanced technology. Smarter control. A safer home.</p>
+  </div>
+</section>
+
+<main class="wrap">
+  <div class="cards">
+    <div class="card">
+      <div class="ic" style="background-image:url('{{ url_for('static', filename='img/icon-smarthome.jpg') }}')"></div>
+      <div class="sep"></div>
+      <div>
+        <h3>What a Smart Home Does</h3>
+        <div class="chips"><span>Monitors</span><i></i><span>Detects</span><i></i><span>Controls</span><i></i><span>Protects</span></div>
+        <p>From security and lighting to temperature, energy and appliances — everything works together for a smarter, safer and more comfortable home.</p>
+      </div>
+    </div>
+
+    <a class="card guide-card" href="{{ url_for('guide') }}" aria-label="How to Use - open the system guide">
+      <div class="ic" style="background-image:url('{{ url_for('static', filename='img/icon-guide.jpg') }}')"></div>
+      <div class="sep"></div>
+      <div style="flex:1">
+        <h3>How to Use</h3>
+        <p>Get a step-by-step guide on how to navigate, control and make the most of your Smart Home System.</p>
+      </div>
+      <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
+    </a>
+  </div>
+
+  <div class="process">
+    <a class="pbtn" href="{{ url_for('dashboard') }}">
+      <svg viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7" width="38" height="27" rx="3"/><path d="M17 41h14M24 34v7"/><path d="M11 25l7-8 6 6 6-9 7 8"/></svg>
+      Process
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:32px;height:32px"><path d="M4 12h16M14 6l6 6-6 6"/></svg>
+    </a>
+    <small>Go to Monitoring Dashboard</small>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="brandline">BARNAFÉ TECH</div>
+    <div class="ver">Smart Home System v1.0</div>
+  </div>
+</footer>
+
+</body>
+</html>

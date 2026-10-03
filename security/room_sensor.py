@@ -3,8 +3,10 @@
 
 import random
 import time
+import wake
 from security.alert_system import send_alert, send_clear_status
 from sensor_data import update_occupancy_state
+from security.alarm import monitoring_paused
 
 rooms = ["Living Room", "Bedroom", "Kitchen", "Garage"]
 room_layer = "Layer 3 - Indoor Rooms"
@@ -16,6 +18,8 @@ def check_room_motion():
 
 
 def scan_rooms():
+    if monitoring_paused():
+        return None
     someone_home = False
     for room in rooms:
         motion = check_room_motion()
@@ -35,11 +39,9 @@ def monitor_rooms(stop_event=None):
     print(" Layer 3, Room Sensor - CONTINUOUS WORKER")
     print("------------------------------------------")
     while stop_event is None or not stop_event.is_set():
+        _gen = wake.generation()
         try:
             scan_rooms()
         except Exception as e:
             print(f"  ⚠️ Room worker error: {e}")
-        if stop_event:
-            stop_event.wait(scan_interval)
-        else:
-            time.sleep(scan_interval)
+        wake.nap(stop_event, scan_interval, _gen)

@@ -112,7 +112,7 @@ def test_temperature_change_immediately_reconciles_ac_and_heater():
         database.DB_PATH = old_db
 
 
-def test_occupancy_and_override_reconcile_temperature_appliances_immediately():
+def test_occupancy_and_system_off_reconcile_temperature_appliances_immediately():
     database, old_db = _isolated_db()
     try:
         import sensor_data
@@ -128,15 +128,15 @@ def test_occupancy_and_override_reconcile_temperature_appliances_immediately():
         sensor_data.update_occupancy_state(True)
         assert sensor_data.read_data()["ac_status"] == "ON"
 
-        sensor_data.set_override("all_off")
+        sensor_data.set_mode("security", "OFF")
         state = sensor_data.read_data()
-        assert state["override_mode"] == "all_off"
+        assert state["security_mode"] == "OFF"
         assert state["ac_status"] == "OFF"
         assert state["heater_status"] == "OFF"
 
-        sensor_data.clear_override()
+        sensor_data.set_mode("security", "AUTO")
         state = sensor_data.read_data()
-        assert state["override_mode"] is None
+        assert state["security_mode"] == "AUTO"
         assert state["ac_status"] == "ON"
     finally:
         database.DB_PATH = old_db
@@ -175,12 +175,12 @@ def test_lights_card_never_shows_stale_empty_house_reason_after_occupancy_return
         assert state["someone_home"] is True
         assert not state["light_reason"].startswith("No one is home")
 
-        # A manual all-off override still wins and is left to the energy
-        # worker's own override branch, unchanged by this reconciliation.
-        sensor_data.set_override("all_off")
-        sensor_data.update_occupancy_state(False)
+        # System OFF keeps lights off even when occupancy changes.
+        sensor_data.set_mode("security", "OFF")
+        sensor_data.update_occupancy_state(True)
         state = sensor_data.read_data()
-        assert state["override_mode"] == "all_off"
+        assert state["light_status"] == "OFF"
+        assert state["light_reason"].startswith("System is OFF")
     finally:
         database.DB_PATH = old_db
 
@@ -239,11 +239,10 @@ def test_dashboard_ac_card_is_derived_from_occupancy_and_weather():
     html = Path(__file__).resolve().parents[1].joinpath(
         "dashboard", "templates", "index.html"
     ).read_text(encoding="utf-8")
-    assert 'const home = !!d.someone_home;' in html
-    assert 'const weather = String(d.temp_status || "NORMAL").trim().toLowerCase();' in html
-    assert 'const forcedOff = d.override_mode === "all_off";' in html
-    # v12: homeowner climate switch sits between Force-OFF and automatic
-    assert 'if (!forcedOff)' in html
-    assert 'cMode === "AUTO" && home' in html
-    assert 'weather === "high"' in html
-    assert 'weather === "low"' in html
+    assert 'const on = m.security_mode !== "OFF";' in html
+    assert 'const home = !!m.someone_home' in html
+    # homeowner AC/Heater choice sits between System-OFF and automatic
+    assert 'if (on) {' in html
+    assert 'cm === "AUTO" && home' in html
+    assert 'w === "high"' in html
+    assert 'w === "low"' in html

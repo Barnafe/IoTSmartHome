@@ -21,6 +21,7 @@ from security.temperature_sensor import monitor_temperature
 from security.gas_sensor import monitor_gas
 from energy.appliance_control import monitor_energy
 from database import cleanup_expired_records
+import wake
 
 WORKERS = (
     ("Gate Security", monitor_gate),
@@ -48,6 +49,22 @@ def _run_worker(name, worker, stop_event, restart_delay=2):
             stop_event.wait(restart_delay)
 
 
+def _watch_security_mode(stop_event, poll_seconds=1.0):
+    """Wake every worker the moment Security Mode changes (ON/OFF/Normal)."""
+    from sensor_data import read_data, system_is_on
+    last = None
+    while not stop_event.is_set():
+        try:
+            on = system_is_on(read_data())
+            if last is not None and on != last:
+                print(f"  🔔 Security Mode changed -> {'ON' if on else 'OFF'}; waking all workers")
+                wake.wake_all()
+            last = on
+        except Exception as exc:
+            print(f"  ⚠️ Security-mode watcher error: {exc}")
+        stop_event.wait(poll_seconds)
+
+
 def start_concurrent_monitoring(stop_event=None):
     """Start all monitoring workers immediately and return their threads."""
     if stop_event is None:
@@ -63,6 +80,10 @@ def start_concurrent_monitoring(stop_event=None):
         )
         thread.start()
         threads.append(thread)
+
+    watcher = threading.Thread(target=_watch_security_mode, args=(stop_event,),
+                               name="SmartHome-Mode-Watcher", daemon=True)
+    watcher.start()  # supervisor helper, deliberately not counted as a worker thread
 
     print(f"  🚀 {len(threads)} independent monitoring workers are running concurrently.")
     return threads

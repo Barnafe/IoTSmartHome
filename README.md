@@ -272,9 +272,12 @@ Camera surveillance remains intentionally outside the global alarm state
 machine: camera detections are recorded and displayed, but camera detection
 never activates the global alarm or automated incident notification manager.
 
-### Climate switch (v12)
-The dashboard's **🌡️ Climate Switch** button pops up OFF / AC / HEATER (plus "Auto").
-OFF/AC/HEATER are obeyed regardless of weather and occupancy; "Auto" hands control
-back to the normal weather/occupancy logic, which is also the default on every fresh
-start. "Force All Appliances OFF" still overrides everything. The switch uses
-`POST /control/climate` via fetch(), so it responds without reloading the page.
+### Pages and homeowner controls (v13)
+- `/` Home page (Process -> dashboard, How to Use -> guide), `/dashboard` live dashboard, `/guide` system guide, `/history` event history.
+- Homeowner Controls (Light, Gate, Door, Security Mode, AC/Heater) each accept ON/OFF (or OPEN/CLOSE, AC/HEATER/OFF) and "Resume normal" (AUTO). They call `POST /control/<device>` with fetch(), so they respond instantly without reloading the page.
+- Security Mode OFF switches the entire system off at once: monitoring workers pause, any alarm is cleared, lights/AC/heater go off. "Force All Appliances OFF" and "Resume Automatic Mode" were removed.
+- Gate/Door OPEN is treated as authorised (never a breach). Manual modes are held in the shared state and reset to AUTO whenever the worker starts.
+
+### v14
+- Workers wake instantly when Security Mode changes (`wake.py`, mode watcher in `engine.py`): after ON every sensor takes a fresh reading within about a second; after OFF they stand down at once.
+- History page and event detail redesigned in the dashboard theme (filters as chips, stat cards, confirm before clearing). The dashboard's Recent Activity and Incident History show the latest 3 items, each clickable, with a View All button.

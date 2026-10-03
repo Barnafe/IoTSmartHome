@@ -1,701 +1,552 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Home Dashboard</title>
-    <style>
-        * { box-sizing: border-box; }
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #1a1a2e;
-            color: white;
-            margin: 0;
-            padding: 20px;
-            width: 100%;
-            overflow-x: hidden;
-        }
-        h1 { text-align: center; color: #e94560; margin-bottom: 5px; }
-        .subtitle { text-align: center; color: #aaa; margin-bottom: 10px; font-size: 14px; }
-        .last-updated { text-align: center; color: #555; font-size: 12px; margin-bottom: 20px; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Home Dashboard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+<style>
+  body{padding:0;background:radial-gradient(1100px 520px at 90% -10%,rgba(8,70,150,.30),transparent 60%),var(--bg);min-height:100vh}
+  .wrap{max-width:1440px;margin:0 auto;padding:0 22px 40px}
 
-        .flash {
-            max-width: 900px;
-            width: 100%;
-            margin: 0 auto 20px auto;
-            background-color: #0f3460;
-            border: 1px solid #2E75B6;
-            border-radius: 8px;
-            padding: 12px 20px;
-            text-align: center;
-            font-size: 14px;
-            color: #9fd3ff;
-        }
+  /* top bar */
+  .topbar{background:var(--topbar);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:40}
+  .topbar .in{max-width:1440px;margin:0 auto;padding:0 22px;min-height:68px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  .ttl h1{margin:0;font-size:20px;color:var(--cyan);font-weight:700;letter-spacing:.2px}
+  .ttl small{color:var(--muted);font-size:12px}
+  .tnav{display:flex;gap:6px;margin-left:8px}
+  .tnav a{color:var(--soft);text-decoration:none;font-size:13.5px;padding:7px 12px;border-radius:8px}
+  .tnav a:hover,.tnav a.cur{background:rgba(15,219,250,.1);color:#fff}
+  .tright{margin-left:auto;display:flex;align-items:center;gap:18px}
+  .clock{text-align:right;line-height:1.25}.clock b{display:block;font-size:19px}.clock span{color:var(--muted);font-size:12px}
+  .pill-st{display:inline-flex;align-items:center;gap:7px;padding:5px 13px;border-radius:999px;font-size:12.5px;font-weight:600;border:1px solid}
+  .pill-st:before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+  .t-good{color:var(--green);border-color:rgba(0,245,155,.5);background:rgba(0,245,155,.08)}
+  .t-bad{color:var(--red);border-color:rgba(249,23,58,.6);background:rgba(249,23,58,.1)}
+  .t-warn{color:var(--amber);border-color:rgba(253,180,1,.55);background:rgba(253,180,1,.08)}
+  .t-info{color:var(--cyan);border-color:rgba(15,219,250,.5);background:rgba(15,219,250,.08)}
+  .t-off{color:#8aa3b8;border-color:rgba(138,163,184,.4);background:rgba(138,163,184,.07)}
+  .admin{display:flex;align-items:center;gap:10px}
+  .avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#0aa7e6,#0a6fd0);display:grid;place-items:center;font-weight:700}
+  .admin div{line-height:1.2;font-size:13px}.admin small{color:var(--muted)}
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            max-width: 900px;
-            width: 100%;
-            margin: 0 auto;
-        }
-        .card {
-            background-color: #16213e;
-            border-radius: 10px;
-            padding: 20px;
-            text-align: center;
-            border: 1px solid #0f3460;
-        }
-        .card h3 { color: #e94560; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; }
-        .card .value { font-size: 24px; font-weight: bold; margin-bottom: 5px; line-height: 1.3; }
-        .card .status { font-size: 13px; color: #aaa; }
+  /* welcome row */
+  .welcome{display:grid;grid-template-columns:1fr minmax(260px,400px) minmax(220px,300px);gap:16px;align-items:stretch;margin:22px 0 16px}
+  .welcome h2{margin:0;font-size:27px;color:var(--cyan)}
+  .welcome p{margin:4px 0 0;color:var(--soft)}
+  .status-banner{display:flex;align-items:center;gap:16px;padding:16px 20px;border-radius:14px;border:1px solid;transition:all .25s}
+  .status-banner .sh{font-size:34px}
+  .status-banner small{display:block;color:var(--muted);font-size:12px;letter-spacing:.4px}
+  .status-banner b{display:block;font-size:26px;letter-spacing:1px;line-height:1.1}
+  .status-banner span{font-size:12.5px;color:var(--soft)}
+  .sb-good{background:#001e2c;border-color:rgba(0,245,155,.5)}.sb-good b{color:var(--green)}
+  .sb-bad{background:#2a0610;border-color:var(--red);animation:blink 1s infinite}.sb-bad b{color:var(--red)}
+  .sb-warn{background:#2a1f00;border-color:rgba(253,180,1,.6)}.sb-warn b{color:var(--amber)}
+  .sb-off{background:#0b1520;border-color:rgba(138,163,184,.4)}.sb-off b{color:#8aa3b8}
+  @keyframes blink{0%,100%{box-shadow:0 0 0 rgba(249,23,58,0)}50%{box-shadow:0 0 22px rgba(249,23,58,.7)}}
+  .weather{display:flex;align-items:center;gap:14px;padding:14px 20px;border-radius:14px;background:var(--card2);border:1px solid var(--line)}
+  .weather .wi{font-size:38px}.weather b{font-size:30px;display:block;line-height:1.1}
+  .weather span{color:var(--soft);font-size:13px;display:block}
 
-        .on { color: #00ff88; }
-        .off { color: #ff4444; }
-        .normal { color: #00ff88; }
-        .high { color: #ff4444; }
-        .low { color: #ffaa00; }
-        .secure { color: #00ff88; }
-        .breach { color: #ff4444; }
-        .safe { color: #00ff88; }
-        .dangerous { color: #ff4444; }
-        .clear { color: #00ff88; }
-        .muted-tag { color: #ffaa00; }
+  /* tiles */
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;transition:opacity .25s,border-color .25s;min-width:0}
+  .tile .th{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .tile .ic{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:19px;background:var(--btn);flex:0 0 36px}
+  .tile .nm{font-size:13px;color:var(--soft);font-weight:600}
+  .tile .badge{margin-left:auto;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid;white-space:nowrap}
+  .tile .val{font-size:21px;font-weight:700;line-height:1.2;overflow-wrap:anywhere}
+  .tile .sub{font-size:12px;color:var(--muted);margin-top:3px;min-height:30px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .tile.bad{border-color:rgba(249,23,58,.7);background:linear-gradient(180deg,#240511,var(--card))}
+  .paused .tile.sense{opacity:.5}
 
-        .alarm-on {
-            background-color: #3d0000;
-            border: 1px solid #ff0000;
-            animation: blink 1s infinite;
-        }
-        @keyframes blink {
-            0% { border-color: #ff0000; }
-            50% { border-color: #3d0000; }
-            100% { border-color: #ff0000; }
-        }
+  /* panels */
+  .main{display:grid;grid-template-columns:minmax(0,1fr) 410px;gap:16px;align-items:start}
+  .left{display:grid;gap:16px;min-width:0}.right{display:grid;gap:16px;min-width:0}
+  .row2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:16px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0}
+  .panel h3{margin:0 0 12px;font-size:14px;display:flex;align-items:center;gap:9px;color:var(--soft);text-transform:uppercase;letter-spacing:.8px}
+  .panel h3 .r{margin-left:auto;text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600}
+  .panel h3 a{color:var(--cyan);text-decoration:none}
 
-        .control-panel {
-            max-width: 900px;
-            width: 100%;
-            margin: 30px auto 0 auto;
-            background-color: #16213e;
-            border-radius: 10px;
-            padding: 20px;
-            border: 1px solid #0f3460;
-        }
-        .control-panel h3 {
-            color: #e94560;
-            text-align: center;
-            margin-top: 0;
-            font-size: 14px;
-            text-transform: uppercase;
-        }
-        .control-buttons {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        .control-buttons form { margin: 0; }
-        .control-buttons button {
-            background-color: #0f3460;
-            color: white;
-            border: 1px solid #2E75B6;
-            border-radius: 6px;
-            padding: 10px 16px;
-            font-size: 13px;
-            cursor: pointer;
-        }
-        .control-buttons button:hover { background-color: #2E75B6; }
-        .control-buttons button.danger { border-color: #ff4444; }
-        .control-buttons button.danger:hover { background-color: #ff4444; }
-        .control-note {
-            text-align: center;
-            color: #666;
-            font-size: 11px;
-            margin-top: 12px;
-        }
+  .cam{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:16/10;background:#000 url('{{ url_for("static", filename="img/hero.jpg") }}') center/cover}
+  .cam .live{position:absolute;top:10px;right:10px;background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:5px;letter-spacing:1px}
+  .cam .cap{position:absolute;left:0;right:0;bottom:0;padding:22px 12px 9px;background:linear-gradient(0deg,rgba(0,8,20,.9),transparent);font-size:12.5px;color:#fff}
+  .cam.paused-cam{filter:grayscale(1) brightness(.4)}
 
+  .feed{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+  .feed li{display:flex;align-items:center;gap:11px;padding:8px 6px;border-radius:9px;min-width:0}
+  .feed li:hover{background:rgba(15,219,250,.05)}
+  .feed .fi{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:16px;flex:0 0 34px;background:var(--btn)}
+  .feed .ft{min-width:0;flex:1}.feed .ft b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .feed .ft span{font-size:12px;color:var(--muted)}.feed time{font-size:12px;color:var(--muted);white-space:nowrap;flex:0 0 auto}
+  a.viewall{padding:5px 13px;border-radius:999px;border:1px solid var(--cyan);background:rgba(15,219,250,.08)}a.viewall:hover{background:var(--cyan);color:#001025}
+  .feed li a.fl{display:flex;align-items:center;gap:11px;width:100%;color:inherit;text-decoration:none;min-width:0}
+  .inc tbody tr{cursor:pointer}.inc tbody tr:hover{background:rgba(15,219,250,.05)}
+  .empty{color:var(--muted);font-size:13.5px;padding:14px 4px}
 
-        /* Climate switch: one button, press once -> OFF / AC / HEATER pop up */
-        .climate-wrap { position: relative; }
-        .climate-wrap > button { border-color: #ffaa00; }
-        .climate-menu {
-            display: none;
-            position: absolute;
-            top: calc(100% + 6px);
-            left: 50%;
-            transform: translateX(-50%);
-            min-width: 190px;
-            background-color: #16213e;
-            border: 1px solid #2E75B6;
-            border-radius: 8px;
-            padding: 6px;
-            z-index: 50;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.5);
-        }
-        .climate-menu.open { display: block; }
-        .climate-menu button {
-            display: block;
-            width: 100%;
-            text-align: left;
-            margin: 2px 0;
-        }
-        .climate-menu button.active { background-color: #2E75B6; border-color: #9fd3ff; }
-        .climate-menu hr { border: 0; border-top: 1px solid #0f3460; margin: 6px 0; }
-        .manual-tag { color: #ffaa00; }
+  table.inc{width:100%;border-collapse:collapse;font-size:13px}
+  .inc th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);font-size:12px}
+  .inc td{padding:9px 8px;border-bottom:1px solid rgba(11,45,82,.6);color:var(--soft);vertical-align:middle}
+  .inc td.ev{color:#fff;max-width:340px}
+  .chip{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
 
-        .footer { text-align: center; margin-top: 30px; color: #555; font-size: 12px; }
+  /* controls */
+  .ctl{padding:12px 0;border-top:1px solid var(--line)}.ctl:first-of-type{border-top:0;padding-top:0}
+  .ctl .hd{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .ctl .hd .ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:var(--btn);font-size:17px}
+  .ctl .hd b{font-size:14.5px}.ctl .hd .st{margin-left:auto;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+  .btns{display:flex;gap:7px}
+  .btns button{flex:1 1 0;min-width:0;background:var(--btn);color:var(--soft);border:1px solid var(--line2);border-radius:9px;padding:10px 6px;
+    font-size:13px;font-weight:700;cursor:pointer;transition:background .12s,border-color .12s,transform .08s;font-family:inherit}
+  .btns button.res{flex:1.25}
+  .btns button:hover{border-color:var(--cyan);color:#fff}
+  .btns button:active{transform:scale(.96)}
+  .btns button.act{background:linear-gradient(180deg,#0a8fd8,#0560b5);border-color:var(--cyan);color:#fff;box-shadow:0 0 14px rgba(15,219,250,.35)}
+  .btns button.act.danger{background:linear-gradient(180deg,#b3142f,#7d0c20);border-color:var(--red);box-shadow:0 0 14px rgba(249,23,58,.35)}
+  .legend{color:var(--muted);font-size:12px;margin:-4px 0 10px}
+  .utils{display:flex;gap:8px;margin-top:6px;padding-top:12px;border-top:1px solid var(--line)}
+  .utils button{flex:1;background:transparent;color:var(--soft);border:1px solid var(--line2);border-radius:9px;padding:9px;font-size:12.5px;cursor:pointer;font-family:inherit}
+  .utils button:hover{border-color:var(--amber);color:#fff}
+  .utils button:disabled{opacity:.55;cursor:wait}
 
-        /* Mobile responsiveness: keep the SAME 3-column layout as PC on
-           phones too (not fewer columns) so related cards - e.g. Occupancy
-           next to Lights, Temperature near AC/Heater - stay visible
-           together instead of being scattered across separate scrolled
-           screens. Text/padding/gaps shrink as the screen narrows so the
-           3-column grid still fits without horizontal overflow. No card
-           order, wording, or JS logic is touched - purely sizing. */
-        @media (max-width: 760px) {
-            .grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
-            .card { padding: 10px; }
-            .card h3 { font-size: 10px; margin-bottom: 5px; }
-            .card .value { font-size: 14px; line-height: 1.2; margin-bottom: 4px; }
-            .card .status { font-size: 9px; }
-            body { padding: 10px; }
-            h1 { font-size: 20px; }
-            .subtitle { font-size: 12px; }
-            .last-updated { font-size: 10px; }
-        }
-        @media (max-width: 480px) {
-            body { padding: 8px; }
-            .grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
-            .card { padding: 6px; }
-            .card h3 { font-size: 8px; margin-bottom: 3px; }
-            .card .value { font-size: 11px; line-height: 1.15; margin-bottom: 2px; }
-            .card .status { font-size: 7px; }
-            .control-panel { padding: 12px; }
-            .control-buttons { flex-direction: column; }
-            .control-buttons form,
-            .control-buttons .climate-wrap,
-            .control-buttons button { width: 100%; }
-            .climate-menu { left: 0; right: 0; transform: none; min-width: 0; }
-            h1 { font-size: 17px; }
-            .subtitle { font-size: 10px; }
-            .last-updated { font-size: 9px; }
-        }
-    </style>
+  .ov{display:grid;gap:2px}
+  .ov div{display:flex;align-items:center;padding:8px 2px;border-bottom:1px solid rgba(11,45,82,.6);font-size:13.5px;color:var(--soft)}
+  .ov div:last-child{border-bottom:0}.ov div b{margin-left:auto;font-weight:700;text-align:right}
+  .g{color:var(--green)}.rd{color:var(--red)}.am{color:var(--amber)}.cy{color:var(--cyan)}.gy{color:#8aa3b8}
+
+  .toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,30px);background:#002c59;border:1px solid var(--cyan);color:#fff;padding:11px 20px;
+    border-radius:11px;font-size:14px;opacity:0;pointer-events:none;transition:all .25s;z-index:100;max-width:90vw;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .foot{text-align:center;color:#46688a;font-size:12px;margin-top:26px}
+
+  @media (max-width:1100px){
+    .main{grid-template-columns:1fr}
+    .welcome{grid-template-columns:1fr 1fr}.welcome .wl{grid-column:1/-1}
+  }
+  @media (max-width:760px){
+    .wrap{padding:0 12px 30px}.topbar .in{padding:8px 12px;gap:10px}
+    .tnav{order:3;width:100%;margin:0}.tright{gap:10px}.clock b{font-size:15px}.admin div{display:none}
+    .row2{grid-template-columns:1fr}.welcome{grid-template-columns:1fr}
+    .tiles{grid-template-columns:repeat(2,1fr);gap:9px}.tile{padding:11px 12px}.tile .val{font-size:17px}
+    .inc .loc{display:none}
+    .tile .th{gap:7px}.tile .ic{width:28px;height:28px;flex-basis:28px;font-size:15px}
+    .tile .nm{font-size:12px}.tile .badge{font-size:10px;padding:2px 7px}
+  }
+</style>
 </head>
 <body>
 
-    <h1>🏠 Smart Home Dashboard</h1>
-<p style="text-align:center"><a href="{{ url_for('history') }}" style="color:#7cc7ff">📚 History</a></p>
-    <p class="subtitle">IoT-Based Smart Home Automation System</p>
-    <p class="last-updated" id="last-updated">
-        Last updated: {{ data.last_updated }} | Live updates enabled<br>
-        Monitoring worker: <strong>{{ data.worker_status }}</strong> |
-        Heartbeat: {{ data.worker_heartbeat }} | Storage: {{ data.db_backend }}
-    </p>
+<header class="topbar"><div class="in">
+  <div class="ttl"><h1>Smart Home System</h1><small>Monitoring • Security • Comfort • Efficiency</small></div>
+  <nav class="tnav">
+    <a href="{{ url_for('home') }}">🏠 Home</a>
+    <a class="cur" href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+    <a href="{{ url_for('history') }}">📚 History</a>
+    <a href="{{ url_for('guide') }}">📖 Guide</a>
+  </nav>
+  <div class="tright">
+    <div class="clock"><b id="clock-time">--:--:--</b><span id="clock-date"></span></div>
+    <span class="pill-st t-good" id="sys-pill">System Online</span>
+    <div class="admin"><div class="avatar">A</div><div>Admin<br><small>Administrator</small></div></div>
+  </div>
+</div></header>
 
-    {% with messages = get_flashed_messages() %}
-        {% if messages %}
-            {% for message in messages %}
-                <div class="flash">ℹ️ {{ message }}</div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
+<div class="wrap" id="page">
 
-    <div class="grid">
+  <section class="welcome">
+    <div class="wl"><h2>Welcome Back,</h2><p>Here's what's happening with your home.</p></div>
+    <div class="status-banner sb-good" id="home-status">
+      <div class="sh" id="hs-icon">🛡️</div>
+      <div><small>Home Status</small><b id="hs-title">SECURE</b><span id="hs-sub">All systems are normal</span></div>
+    </div>
+    <div class="weather">
+      <div class="wi" id="wx-icon">⛅</div>
+      <div><b id="wx-temp">--°C</b><span id="wx-cond">House temperature</span></div>
+    </div>
+  </section>
 
-        <div id="alarm-card" class="card {% if data.alarm_active %}alarm-on{% endif %}">
-            <h3>🚨 Alarm Status</h3>
-            <div id="alarm-value" class="value {{ 'off' if data.alarm_active else 'on' }}">
-                {{ 'TRIGGERED' if data.alarm_active else 'ALL CLEAR' }}
-            </div>
-            <div id="alarm-details" class="status">
-                {% if data.alarm_active %}
-                    {{ data.last_detection }}
-                {% else %}
-                    Gate, Door &amp; Gas layers combined
-                {% endif %}
-                {% if data.alarm_active and data.siren_muted %}
-                    <br><span class="muted-tag">🔇 Siren manually silenced</span>
-                {% endif %}
-            </div>
+  <section class="tiles">
+    <div class="tile sense" id="t-gate"><div class="th"><div class="ic">🚧</div><div class="nm">Gate</div><span class="badge" id="gate-badge"></span></div><div class="val" id="gate-value">—</div><div class="sub">Layer 1 · Gate sensor</div></div>
+    <div class="tile sense" id="t-door"><div class="th"><div class="ic">🚪</div><div class="nm">Door</div><span class="badge" id="door-badge"></span></div><div class="val" id="door-value">—</div><div class="sub">Layer 2 · Door sensors</div></div>
+    <div class="tile sense" id="t-occ"><div class="th"><div class="ic">🏠</div><div class="nm">Indoor / Room</div><span class="badge" id="occ-badge"></span></div><div class="val" id="occupancy-value">—</div><div class="sub">PIR motion detection</div></div>
+    <div class="tile sense" id="t-cam"><div class="th"><div class="ic">📷</div><div class="nm">Camera</div><span class="badge" id="cam-badge"></span></div><div class="val" id="camera-value">—</div><div class="sub" id="camera-status">—</div></div>
+    <div class="tile sense" id="t-temp"><div class="th"><div class="ic">🌡️</div><div class="nm">Temperature</div><span class="badge" id="temp-badge"></span></div><div class="val" id="temp-value">—</div><div class="sub" id="temp-status">—</div></div>
+    <div class="tile sense" id="t-gas"><div class="th"><div class="ic">🔥</div><div class="nm">Gas</div><span class="badge" id="gas-badge"></span></div><div class="val" id="gas-value">—</div><div class="sub" id="gas-status">—</div></div>
+    <div class="tile" id="t-light"><div class="th"><div class="ic">💡</div><div class="nm">Lights</div><span class="badge" id="light-badge"></span></div><div class="val" id="light-value">—</div><div class="sub" id="light-status">—</div></div>
+    <div class="tile" id="t-ac"><div class="th"><div class="ic">❄️</div><div class="nm">AC / Heater</div><span class="badge" id="ac-badge"></span></div><div class="val" id="ac-value">—</div><div class="sub" id="heater-value">—</div></div>
+  </section>
+
+  <div class="main">
+    <div class="left">
+      <div class="row2">
+        <div class="panel">
+          <h3>📹 Live Camera Feed <span class="r g" id="feed-live">● Online</span></h3>
+          <div class="cam" id="cam"><span class="live" id="cam-live">LIVE</span><div class="cap">Front View · Main Gate</div></div>
         </div>
-
-        <div class="card">
-            <h3>🚪 Gate Status</h3>
-            <div id="gate-value" class="value {{ 'secure' if data.gate_status == 'SECURE' else 'breach' }}">
-                {{ data.gate_status }}
-            </div>
-            <div class="status">Layer 1 - Gate sensor</div>
+        <div class="panel">
+          <h3>🕒 Recent Activity <span class="r"><a class="viewall" href="{{ url_for('history') }}">View All →</a></span></h3>
+          <ul class="feed" id="activity"><li class="empty">Loading activity…</li></ul>
         </div>
-
-        <div class="card">
-            <h3>🚪 Door Status</h3>
-            <div id="door-value" class="value {{ 'secure' if data.door_status == 'ALL CLOSED' else 'breach' }}">
-                {{ data.door_status }}
-            </div>
-            <div class="status">Layer 2 - Door sensors</div>
+      </div>
+      <div class="panel">
+        <h3>📋 Incident History <span class="r"><a class="viewall" href="{{ url_for('history') }}">View All →</a></span></h3>
+        <div style="overflow-x:auto">
+          <table class="inc"><thead><tr><th>Date &amp; Time</th><th>Event</th><th class="loc">Location</th><th>Status</th></tr></thead>
+          <tbody id="incidents"><tr><td colspan="4" class="empty">Loading incidents…</td></tr></tbody></table>
         </div>
-
-        <div class="card">
-            <h3>📷 Camera Status</h3>
-            <div id="camera-value" class="value {{ 'breach' if 'Unauthorised' in data.camera_status else 'clear' }}">
-                {{ data.camera_status }}
-            </div>
-            <div id="camera-status" class="status">{{ data.camera_last_seen }}</div>
-        </div>
-
-        <div class="card">
-            <h3>🌡️ Temperature</h3>
-            <div id="temp-value" class="value {{ data.temp_status | lower }}">
-                {{ data.temperature }}°C
-            </div>
-            <div id="temp-status" class="status">Status: {{ data.temp_status }} (AC/Heater auto-respond)</div>
-        </div>
-
-        <div class="card">
-            <h3>💨 Gas Level</h3>
-            <div id="gas-value" class="value {{ 'safe' if data.gas_status == 'SAFE' else 'dangerous' }}">
-                {{ data.gas_level }}%
-            </div>
-            <div id="gas-status" class="status">Status: {{ data.gas_status }}</div>
-        </div>
-
-        <div class="card">
-            <h3>🏠 Occupancy</h3>
-            <div id="occupancy-value" class="value {{ 'on' if data.someone_home else 'off' }}">
-                {{ 'SOMEONE HOME' if data.someone_home else 'EMPTY' }}
-            </div>
-            <div class="status">PIR motion detection</div>
-        </div>
-
-        <div class="card">
-            <h3>💡 Lights</h3>
-            <div id="light-value" class="value {{ 'on' if data.light_status == 'ON' else 'off' }}">
-                {{ data.light_status }}
-            </div>
-            <div id="light-status" class="status">{{ data.light_reason }}</div>
-        </div>
-
-        <div class="card">
-            <h3>❄️ AC / 🔥 Heater</h3>
-            <div id="ac-value" class="value {{ 'on' if data.ac_status == 'ON' else 'off' }}">
-                AC: {{ data.ac_status }}
-            </div>
-            <div id="heater-value" class="status {{ 'on' if data.heater_status == 'ON' else 'off' }}">
-                Heater: {{ data.heater_status }}
-            </div>
-            <div id="climate-tag" class="status manual-tag">
-                {% if data.override_mode != 'all_off' and data.climate_mode in ('AC', 'HEATER', 'OFF') %}
-                    🎚️ Manual: {{ data.climate_mode }}
-                {% endif %}
-            </div>
-        </div>
-
+      </div>
     </div>
 
-    <div class="control-panel">
+    <div class="right">
+      <div class="panel" id="controls">
         <h3>🎛️ Homeowner Controls</h3>
-        <div class="control-buttons">
-            <form id="silence-form" action="{{ url_for('control_silence') }}" method="POST">
-                <button type="submit">🔇 Silence Siren</button>
-            </form>
-            <div class="climate-wrap" id="climate-wrap">
-                <button type="button" id="climate-toggle" aria-haspopup="true" aria-expanded="false">🌡️ Climate Switch ▾</button>
-                <div class="climate-menu" id="climate-menu" role="menu">
-                    <button type="button" data-mode="OFF" role="menuitem">⛔ OFF</button>
-                    <button type="button" data-mode="AC" role="menuitem">❄️ AC</button>
-                    <button type="button" data-mode="HEATER" role="menuitem">🔥 HEATER</button>
-                    <hr>
-                    <button type="button" data-mode="AUTO" role="menuitem">🔄 Auto (weather decides)</button>
-                </div>
-            </div>
-            <form action="{{ url_for('control_off') }}" method="POST">
-                <button type="submit" class="danger">🖐️ Force All Appliances OFF</button>
-            </form>
-            <form action="{{ url_for('control_resume') }}" method="POST">
-                <button type="submit">🔄 Resume Automatic Mode</button>
-            </form>
-            <form action="{{ url_for('control_test_email') }}" method="POST">
-                <button type="submit">📧 Send Test Email</button>
-            </form>
-        </div>
-        <p class="control-note">
-            Current mode:
-            <span id="mode-note">
-            {% if data.override_mode == 'all_off' %}
-                Manual override (all appliances forced off)
-            {% else %}
-                Automatic
-            {% endif %}
-            </span>
-            <br>
-            Climate switch:
-            <span id="climate-note">
-            {% if data.climate_mode in ('AC', 'HEATER', 'OFF') %}
-                Manual - {{ data.climate_mode }}
-            {% else %}
-                Auto (weather decides)
-            {% endif %}
-            </span>
-        </p>
-    </div>
+        <p class="legend">↺ Normal = resume normal (automatic) mode</p>
 
-    <div class="footer">
-        <p>Smart Home Automation System | By: Tavershima Aondoalough Barnabas</p>
+        <div class="ctl" data-device="light">
+          <div class="hd"><span class="ic">💡</span><b>Light</b><span class="st" id="st-light"></span></div>
+          <div class="btns"><button data-mode="ON">ON</button><button data-mode="OFF">OFF</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
+        </div>
+        <div class="ctl" data-device="gate">
+          <div class="hd"><span class="ic">🚧</span><b>Gate</b><span class="st" id="st-gate"></span></div>
+          <div class="btns"><button data-mode="OPEN">OPEN</button><button data-mode="CLOSED">CLOSE</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
+        </div>
+        <div class="ctl" data-device="door">
+          <div class="hd"><span class="ic">🚪</span><b>Door</b><span class="st" id="st-door"></span></div>
+          <div class="btns"><button data-mode="OPEN">OPEN</button><button data-mode="CLOSED">CLOSE</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
+        </div>
+        <div class="ctl" data-device="security">
+          <div class="hd"><span class="ic">🛡️</span><b>Security Mode</b><span class="st" id="st-security"></span></div>
+          <div class="btns"><button data-mode="ON">ON</button><button data-mode="OFF" class="offbtn">OFF</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
+        </div>
+        <div class="ctl" data-device="climate">
+          <div class="hd"><span class="ic">❄️</span><b>AC / Heater</b><span class="st" id="st-climate"></span></div>
+          <div class="btns"><button data-mode="AC">AC</button><button data-mode="HEATER">HEATER</button><button data-mode="OFF">OFF</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
+        </div>
+
+        <div class="utils">
+          <button id="silence-btn" type="button" data-url="{{ url_for('control_silence') }}">🔇 Silence Siren</button>
+          <button id="email-btn" type="button" data-url="{{ url_for('control_test_email') }}">📧 Send Test Email</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3>📈 System Overview</h3>
+        <div class="ov">
+          <div>Worker Status <b id="ov-worker">—</b></div>
+          <div>Last Heartbeat <b id="ov-hb">—</b></div>
+          <div>Security Mode <b id="ov-sec">—</b></div>
+          <div>Alarm Active <b id="ov-alarm">—</b></div>
+          <div>Alarm Layers <b id="ov-layers">—</b></div>
+          <div>Someone Home <b id="ov-home">—</b></div>
+          <div>Last Updated <b id="ov-upd">—</b></div>
+          <div>Storage <b id="ov-db">—</b></div>
+        </div>
+      </div>
     </div>
+  </div>
+
+  <div class="foot">Smart Home Automation System | By: Tavershima Aondoalough Barnabas | Barnafé Tech Services</div>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
 (function () {
-    const alarmCard = document.getElementById("alarm-card");
-    const alarmValue = document.getElementById("alarm-value");
-    const alarmDetails = document.getElementById("alarm-details");
-    const gateValue = document.getElementById("gate-value");
-    const doorValue = document.getElementById("door-value");
-    const gasValue = document.getElementById("gas-value");
-    const gasStatus = document.getElementById("gas-status");
-    const tempValue = document.getElementById("temp-value");
-    const tempStatus = document.getElementById("temp-status");
-    const acValue = document.getElementById("ac-value");
-    const heaterValue = document.getElementById("heater-value");
-    const cameraValue = document.getElementById("camera-value");
-    const cameraStatus = document.getElementById("camera-status");
-    const occupancyValue = document.getElementById("occupancy-value");
-    const lightValue = document.getElementById("light-value");
-    const lightStatus = document.getElementById("light-status");
-    const updated = document.getElementById("last-updated");
+  const $ = id => document.getElementById(id);
+  const URLS = {
+    state: "{{ url_for('api_state') }}",
+    history: "{{ url_for('api_history') }}",
+    detail: "{{ url_for('history') }}/",
+    control: d => "{{ url_for('control_device', device='__D__') }}".replace("__D__", d)
+  };
+  let last = {{ data | tojson }};
+  let epoch = 0;          // bumps on every control press; stale polls are discarded
+  let inflight = 0;
 
-    function setClass(el, remove, add) {
-        if (!el) return;
-        remove.forEach(c => el.classList.remove(c));
-        if (add) el.classList.add(add);
+  const TONES = ["t-good","t-bad","t-warn","t-info","t-off"];
+  function tone(el, t, text) {
+    if (!el) return;
+    TONES.forEach(c => el.classList.remove(c));
+    el.classList.add("t-" + t);
+    if (text !== undefined) el.textContent = text;
+  }
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+  // ---- toast ----
+  let toastTimer;
+  function toast(msg) {
+    const t = $("toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
+  }
+
+  // ---- clock ----
+  function tick() {
+    const n = new Date();
+    $("clock-time").textContent = n.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    $("clock-date").textContent = n.toLocaleDateString([], {weekday:"short", day:"2-digit", month:"short", year:"numeric"});
+  }
+  tick(); setInterval(tick, 1000);
+
+  // ---- siren (front-end audio only; reads alarm_active / siren_muted) ----
+  // Browsers only allow sound after a user gesture; the unlock listeners keep
+  // trying on every tap/click/key until one succeeds.
+  let audioCtx = null, sirenTimer = null, audioUnlocked = false;
+  function ctxGet() {
+    if (!audioCtx) { const C = window.AudioContext || window.webkitAudioContext; if (C) audioCtx = new C(); }
+    return audioCtx;
+  }
+  function unlockAudio() {
+    if (audioUnlocked) return;
+    const ctx = ctxGet(); if (!ctx) return;
+    try {
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      g.gain.value = 0.0001; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.05);
+    } catch (e) {}
+    if (ctx.state !== "suspended") { audioUnlocked = true; if (sirenTimer) pim(); }
+  }
+  ["click","touchstart","pointerdown","keydown"].forEach(e => document.addEventListener(e, unlockAudio));
+  function beep(off, f) {
+    const ctx = ctxGet(); if (!ctx) return;
+    const o = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime + off;
+    o.type = "square"; o.frequency.value = f;
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.15, t0 + 0.01); g.gain.linearRampToValueAtTime(0, t0 + 0.12);
+    o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + 0.14);
+  }
+  function pim() { const c = ctxGet(); if (!c || c.state === "suspended") return; beep(0, 1000); beep(0.18, 1000); }
+  function siren(on) {
+    if (on && !sirenTimer) { pim(); sirenTimer = setInterval(pim, 1000); }
+    else if (!on && sirenTimer) { clearInterval(sirenTimer); sirenTimer = null; }
+  }
+
+  // ---- derived values for instant (optimistic) feedback ----
+  // Mirrors the server's rules so a press shows its result before the reply
+  // arrives; the server's authoritative state then replaces it.
+  function derive(d) {
+    const m = Object.assign({}, d);
+    const on = m.security_mode !== "OFF";
+    const home = !!m.someone_home, w = String(m.temp_status || "NORMAL").toLowerCase(), cm = m.climate_mode || "AUTO";
+    let ac = "OFF", ht = "OFF";
+    if (on) {
+      if (cm === "AC") ac = "ON"; else if (cm === "HEATER") ht = "ON";
+      else if (cm === "AUTO" && home) { if (w === "high") ac = "ON"; else if (w === "low") ht = "ON"; }
     }
-
-    // --- Siren sound ("pim-pim") -------------------------------------
-    // Purely a front-end audio effect layered on top of the alarm-blinking
-    // behaviour that already exists. It does not change alarm_active,
-    // siren_muted, or any other state - it only reads the same two fields
-    // the page already used to render the red-light blink and the
-    // "Siren manually silenced" tag, and uses a tiny generated beep
-    // (Web Audio API oscillator) so no external sound file is needed.
-    let audioCtx = null;
-    let sirenTimer = null;
-
-    function getAudioCtx() {
-        if (!audioCtx) {
-            const Ctx = window.AudioContext || window.webkitAudioContext;
-            if (Ctx) audioCtx = new Ctx();
-        }
-        return audioCtx;
+    m.ac_status = ac; m.heater_status = ht;
+    if (!on) { m.light_status = "OFF"; m.light_reason = "System is OFF — all automation paused"; }
+    else if (m.light_mode === "ON") { m.light_status = "ON"; m.light_reason = "Manual — homeowner turned lights ON"; }
+    else if (m.light_mode === "OFF") { m.light_status = "OFF"; m.light_reason = "Manual — homeowner turned lights OFF"; }
+    else if (/^(Manual|System is OFF)/.test(m.light_reason || "")) { m.light_reason = "Automatic — updating…"; }
+    if (!on) {
+      Object.assign(m, {alarm_active:false, alarm_layers:[], siren_muted:false, gate_status:"PAUSED", door_status:"PAUSED",
+        gas_status:"PAUSED", camera_status:"PAUSED", camera_last_seen:"System OFF", last_detection:"System OFF — monitoring paused"});
+    } else {
+      if (d.security_mode === "OFF" && m.security_mode !== "OFF") {
+        Object.assign(m, {gate_status:"SECURE", door_status:"ALL CLOSED", gas_status:"SAFE", camera_status:"CLEAR", camera_last_seen:"No person detected"});
+      }
+      if (m.gate_mode === "OPEN") { m.gate_status = "OPEN"; m.alarm_layers = (m.alarm_layers || []).filter(l => l !== "gate"); }
+      else if (m.gate_status === "OPEN") m.gate_status = "SECURE";
+      if (m.door_mode === "OPEN") { m.door_status = "OPEN"; m.alarm_layers = (m.alarm_layers || []).filter(l => l !== "door"); }
+      else if (m.door_status === "OPEN") m.door_status = "ALL CLOSED";
+      if (Array.isArray(m.alarm_layers) && !m.alarm_layers.length) { m.alarm_active = false; m.siren_muted = false; }
     }
+    return m;
+  }
 
-    // Browsers require a real user gesture (tap/click/key) before ANY
-    // audio - including this one - is allowed to play. This is a browser
-    // security policy (Chrome, Safari, Firefox all enforce it the same
-    // way) to stop pages auto-playing sound; no front-end code can bypass
-    // it, so on a completely untouched page load the siren truly cannot
-    // sound before the very first tap - the red-light blink still fires
-    // instantly regardless, with or without a tap.
-    //
-    // What WAS a bug: the old code only ever tried to unlock audio once
-    // (`{ once: true }`) and removed itself even if that attempt silently
-    // failed - which some mobile/in-app browsers do on the very first
-    // try. That's the "sometimes it works, sometimes it doesn't" the user
-    // saw. Fixed by (1) not removing the listener - every tap/click/key
-    // gets a fresh chance until one actually succeeds, (2) playing a real
-    // (inaudible) sound synchronously inside the gesture itself, which is
-    // the standard fix for iOS/Android browsers that report the audio
-    // context as "running" without truly having unlocked output yet, and
-    // (3) firing the siren immediately the instant it unlocks, instead of
-    // waiting up to 1 second for the next scheduled beep.
-    let audioUnlocked = false;
-    function unlockAudio() {
-        if (audioUnlocked) return;
-        const ctx = getAudioCtx();
-        if (!ctx) return;
+  // ---- render everything from one state object ----
+  const CTL_TEXT = {
+    light:    d => [d.light_status, d.light_mode],
+    gate:     d => [d.gate_status, d.gate_mode],
+    door:     d => [d.door_status, d.door_mode],
+    security: d => [d.security_mode === "OFF" ? "OFF" : "ARMED", d.security_mode],
+    climate:  d => [d.ac_status === "ON" ? "AC ON" : d.heater_status === "ON" ? "HEATER ON" : "BOTH OFF", d.climate_mode]
+  };
+  function goodBad(v, goods) { return goods.includes(v) ? "good" : (v === "PAUSED" ? "off" : "bad"); }
+
+  function render(d) {
+    d = Object.assign({light_mode:"AUTO", gate_mode:"AUTO", door_mode:"AUTO", security_mode:"AUTO", climate_mode:"AUTO"}, d);
+    last = d;
+    const on = d.security_mode !== "OFF";
+    const alarm = !!d.alarm_active;
+    const wOnline = String(d.worker_status || "").startsWith("ONLINE");
+    document.body.classList.toggle("paused", !on);
+
+    // header pill + home status
+    if (!on) tone($("sys-pill"), "off", "System Off");
+    else if (!wOnline) tone($("sys-pill"), "warn", "Worker Offline");
+    else tone($("sys-pill"), "good", "System Online");
+
+    const hs = $("home-status");
+    ["sb-good","sb-bad","sb-warn","sb-off"].forEach(c => hs.classList.remove(c));
+    if (!on) { hs.classList.add("sb-off"); $("hs-icon").textContent = "⏻"; $("hs-title").textContent = "SYSTEM OFF"; $("hs-sub").textContent = "Monitoring is paused"; }
+    else if (alarm) { hs.classList.add("sb-bad"); $("hs-icon").textContent = "🚨"; $("hs-title").textContent = "ALERT";
+      $("hs-sub").textContent = (d.last_detection || "Active breach") + (d.siren_muted ? " · siren silenced" : ""); }
+    else if (!wOnline) { hs.classList.add("sb-warn"); $("hs-icon").textContent = "⚠️"; $("hs-title").textContent = "NO LIVE DATA"; $("hs-sub").textContent = "Monitoring worker is offline"; }
+    else { hs.classList.add("sb-good"); $("hs-icon").textContent = "🛡️"; $("hs-title").textContent = "SECURE"; $("hs-sub").textContent = "All systems are normal"; }
+    siren(on && alarm && !d.siren_muted);
+
+    // temperature / weather card
+    const ts = String(d.temp_status || "NORMAL").toUpperCase();
+    $("wx-temp").textContent = (d.temperature ?? "--") + "°C";
+    $("wx-icon").textContent = ts === "HIGH" ? "🥵" : ts === "LOW" ? "🥶" : "⛅";
+    $("wx-cond").textContent = "House · " + (ts === "HIGH" ? "Hot" : ts === "LOW" ? "Cold" : "Comfortable");
+
+    // tiles
+    $("gate-value").textContent = d.gate_status || "SECURE";
+    tone($("gate-badge"), d.gate_status === "OPEN" ? "info" : goodBad(d.gate_status, ["SECURE"]), d.gate_status === "SECURE" ? "Closed" : d.gate_status === "OPEN" ? "Open" : d.gate_status === "PAUSED" ? "Paused" : "Breach");
+    $("door-value").textContent = d.door_status || "ALL CLOSED";
+    tone($("door-badge"), d.door_status === "OPEN" ? "info" : goodBad(d.door_status, ["ALL CLOSED"]), d.door_status === "ALL CLOSED" ? "Secure" : d.door_status === "OPEN" ? "Open" : d.door_status === "PAUSED" ? "Paused" : "Breach");
+    $("occupancy-value").textContent = d.someone_home ? "SOMEONE HOME" : "EMPTY";
+    tone($("occ-badge"), !on ? "off" : d.someone_home ? "good" : "info", !on ? "Paused" : d.someone_home ? "Active" : "Empty");
+
+    const camBreach = String(d.camera_status || "").includes("Unauthorised");
+    $("camera-value").textContent = d.camera_status || "CLEAR";
+    $("camera-status").textContent = d.camera_last_seen || "No person detected";
+    tone($("cam-badge"), !on ? "off" : camBreach ? "bad" : "good", !on ? "Paused" : camBreach ? "Alert" : "Online");
+    $("cam").classList.toggle("paused-cam", !on);
+    $("cam-live").style.display = on ? "" : "none";
+    $("feed-live").className = "r " + (!on ? "gy" : "g");
+    $("feed-live").textContent = !on ? "● Off" : "● Online";
+
+    $("temp-value").textContent = (d.temperature ?? 0) + "°C";
+    $("temp-status").textContent = "Status: " + ts;
+    tone($("temp-badge"), !on ? "off" : ts === "HIGH" ? "bad" : ts === "LOW" ? "warn" : "good", !on ? "Paused" : ts === "NORMAL" ? "Normal" : ts === "HIGH" ? "High" : "Low");
+    $("gas-value").textContent = (d.gas_level ?? 0) + "%";
+    $("gas-status").textContent = "Status: " + (d.gas_status || "SAFE");
+    tone($("gas-badge"), d.gas_status === "PAUSED" ? "off" : d.gas_status === "SAFE" ? "good" : "bad", d.gas_status === "PAUSED" ? "Paused" : d.gas_status === "SAFE" ? "Normal" : "Danger");
+
+    const lightOn = d.light_status === "ON";
+    $("light-value").textContent = d.light_status || "OFF";
+    $("light-status").textContent = d.light_reason || "";
+    tone($("light-badge"), !on ? "off" : d.light_mode !== "AUTO" ? "warn" : lightOn ? "good" : "info", !on ? "Paused" : d.light_mode !== "AUTO" ? "Manual" : "Auto");
+    const acOn = d.ac_status === "ON", htOn = d.heater_status === "ON";
+    $("ac-value").textContent = acOn ? "AC ON" : htOn ? "HEATER ON" : "BOTH OFF";
+    $("heater-value").textContent = (on && d.climate_mode !== "AUTO") ? "Manual: " + d.climate_mode : (on ? "Automatic (weather decides)" : "System OFF");
+    tone($("ac-badge"), !on ? "off" : d.climate_mode !== "AUTO" ? "warn" : (acOn || htOn) ? "good" : "info", !on ? "Paused" : d.climate_mode !== "AUTO" ? "Manual" : "Auto");
+    $("t-gate").classList.toggle("bad", d.gate_status === "BREACH");
+    $("t-door").classList.toggle("bad", String(d.door_status || "").startsWith("BREACH"));
+    $("t-gas").classList.toggle("bad", d.gas_status === "DANGEROUS");
+    $("t-cam").classList.toggle("bad", camBreach);
+
+    // controls: status pills + highlighted active button
+    Object.keys(CTL_TEXT).forEach(dev => {
+      const [text, mode] = CTL_TEXT[dev](d);
+      const manual = mode && mode !== "AUTO";
+      const t = (dev === "security" && !on) ? "bad" : manual ? "warn" : (text === "ON" || text === "ARMED" || text === "SECURE" || text === "ALL CLOSED" || text.endsWith(" ON")) ? "good" : (text === "BREACH" || text === "BREACH DETECTED") ? "bad" : (text === "OPEN" ? "info" : "info");
+      tone($("st-" + dev), t, text + (manual ? " · Manual" : ""));
+      document.querySelectorAll('.ctl[data-device="' + dev + '"] .btns button').forEach(b => {
+        b.classList.toggle("act", b.dataset.mode === (mode || "AUTO"));
+        b.classList.toggle("danger", b.dataset.mode === "OFF" && dev === "security");
+      });
+    });
+
+    // overview
+    const setOv = (id, text, cls) => { const e = $(id); e.textContent = text; e.className = cls || ""; };
+    setOv("ov-worker", d.worker_status || "OFFLINE", wOnline ? "g" : "rd");
+    setOv("ov-hb", d.worker_heartbeat || "waiting...");
+    setOv("ov-sec", on ? "ARMED" : "OFF", on ? "g" : "rd");
+    setOv("ov-alarm", alarm ? "Yes" : "No", alarm ? "rd" : "g");
+    setOv("ov-layers", (Array.isArray(d.alarm_layers) && d.alarm_layers.length) ? d.alarm_layers.join(", ") : "None", alarm ? "am" : "");
+    setOv("ov-home", d.someone_home ? "Yes" : "No", d.someone_home ? "g" : "gy");
+    setOv("ov-upd", d.last_updated || "waiting...");
+    setOv("ov-db", d.db_backend || "?");
+  }
+
+  // ---- events: recent activity + incident history ----
+  const EVT = {
+    security_breach:   ["🚨", "t-bad"],  security_clear: ["✅", "t-good"],
+    camera_detection:  ["📷", "t-warn"], homeowner_control: ["🎛️", "t-info"],
+    climate_override:  ["🌡️", "t-info"], energy_override: ["💡", "t-warn"]
+  };
+  function when(iso) {
+    const t = new Date(iso); if (isNaN(t)) return "";
+    return t.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  }
+  function whenFull(iso) {
+    const t = new Date(iso); if (isNaN(t)) return "";
+    return t.toLocaleDateString([], {day:"2-digit", month:"short"}) + ", " + t.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  }
+  let loadingEvents = false;
+  async function loadEvents() {
+    if (loadingEvents) return; loadingEvents = true;
+    try {
+      const r = await fetch(URLS.history + "?limit=40", {cache: "no-store"});
+      if (!r.ok) return;
+      const ev = (await r.json()).events || [];
+      const act = ev.slice(0, 3).map(e => {
+        const [ic, tn] = EVT[e.event_type] || ["📋", "t-info"];
+        return '<li><a class="fl" href="' + URLS.detail + e.id + '"><span class="fi ' + tn + '" style="border:0">' + ic + '</span><div class="ft"><b>' + esc(e.message) + '</b><span>' + esc(e.location || e.source) + '</span></div><time>' + when(e.created_at) + '</time></a></li>';
+      }).join("");
+      $("activity").innerHTML = act || '<li class="empty">No activity recorded yet.</li>';
+      const inc = ev.filter(e => e.severity === "critical" || e.severity === "warning").slice(0, 3).map(e => {
+        const crit = e.severity === "critical";
+        return '<tr onclick="location.href=\'' + URLS.detail + e.id + '\'"><td>' + whenFull(e.created_at) + '</td><td class="ev">' + esc(e.message) + '</td><td class="loc">' + esc(e.location || e.source) + '</td><td><span class="chip ' + (crit ? "t-bad" : "t-warn") + '">' + (crit ? "Critical" : "Warning") + '</span></td></tr>';
+      }).join("");
+      $("incidents").innerHTML = inc || '<tr><td colspan="4" class="empty">No incidents recorded. 🎉</td></tr>';
+    } catch (e) {} finally { loadingEvents = false; }
+  }
+
+  // ---- polling ----
+  async function poll() {
+    if (inflight) return;
+    const my = epoch;
+    try {
+      const r = await fetch(URLS.state, {cache: "no-store"});
+      if (!r.ok) return;
+      const d = await r.json();
+      if (my === epoch && !inflight) render(d);   // never let a stale poll overwrite a fresh press
+    } catch (e) {}
+  }
+
+  // ---- homeowner controls: instant, no page reload ----
+  document.querySelectorAll(".ctl").forEach(row => {
+    row.querySelectorAll("button").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const dev = row.dataset.device, mode = btn.dataset.mode;
+        epoch++; inflight++;
+        const before = last;
+        // 1) show the result immediately
+        const pending = Object.assign({}, last); pending[dev + "_mode"] = mode;
+        render(derive(pending));
+        // 2) confirm with the server and adopt its authoritative state
+        const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 8000);
         try {
-            if (ctx.state === "suspended") ctx.resume().catch(() => {});
-            // A real, near-silent tone committed inside this same gesture -
-            // more reliable across mobile browsers than resume() alone.
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            gain.gain.value = 0.0001;
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.05);
-        } catch (err) { /* try again on the next gesture */ }
-        if (ctx.state !== "suspended") {
-            audioUnlocked = true;
-            if (sirenTimer) playPimPim(); // don't make them wait for the next tick
-        }
-    }
-    ["click", "touchstart", "pointerdown", "keydown"].forEach(evt =>
-        document.addEventListener(evt, unlockAudio)
-    );
+          const r = await fetch(URLS.control(dev), {
+            method: "POST", credentials: "same-origin", signal: ctl.signal,
+            headers: {"X-Requested-With": "fetch", "Content-Type": "application/x-www-form-urlencoded"},
+            body: "mode=" + encodeURIComponent(mode)
+          });
+          const j = await r.json();
+          if (j.ok) { render(j.state); toast(j.message); loadEvents(); }
+          else { render(before); toast("That option could not be applied."); }
+        } catch (e) {
+          render(before); toast("No connection - the change was not applied.");
+        } finally { clearTimeout(to); inflight--; epoch++; }
+      });
+    });
+  });
 
-    function playBeep(startOffset, freq) {
-        const ctx = getAudioCtx();
-        if (!ctx) return;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "square";
-        osc.frequency.value = freq;
-        const t0 = ctx.currentTime + startOffset;
-        const dur = 0.12;
-        gain.gain.setValueAtTime(0, t0);
-        gain.gain.linearRampToValueAtTime(0.15, t0 + 0.01);
-        gain.gain.linearRampToValueAtTime(0, t0 + dur);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(t0);
-        osc.stop(t0 + dur + 0.02);
-    }
+  // ---- utility buttons ----
+  async function utility(btn, busyText) {
+    const old = btn.textContent; btn.disabled = true; btn.textContent = busyText;
+    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 12000);
+    try {
+      const r = await fetch(btn.dataset.url, {method: "POST", credentials: "same-origin", signal: ctl.signal, headers: {"X-Requested-With": "fetch"}});
+      const j = await r.json();
+      toast(j.message || (j.ok ? "Done." : "Failed."));
+      if (j.state) render(j.state);
+    } catch (e) { toast("No connection - please try again."); }
+    finally { clearTimeout(to); btn.disabled = false; btn.textContent = old; }
+  }
+  $("silence-btn").addEventListener("click", e => { epoch++; utility(e.currentTarget, "🔇 Silencing…").then(() => epoch++); });
+  $("email-btn").addEventListener("click", e => utility(e.currentTarget, "📧 Sending…"));
 
-    function playPimPim() {
-        const ctx = getAudioCtx();
-        if (!ctx || ctx.state === "suspended") return; // no user gesture yet - stay silent, blinking still works
-        playBeep(0, 1000);     // "pim"
-        playBeep(0.18, 1000);  // "pim"
-    }
-
-    function setSirenSounding(shouldSound) {
-        if (shouldSound && !sirenTimer) {
-            playPimPim();
-            sirenTimer = setInterval(playPimPim, 1000);
-        } else if (!shouldSound && sirenTimer) {
-            clearInterval(sirenTimer);
-            sirenTimer = null;
-        }
-    }
-    // -------------------------------------------------------------------
-
-    let climateBusy = false;      // a climate-switch request is in flight
-    let lastForcedOff = false;    // last known Force-OFF state from the server
-
-    async function refreshLiveState() {
-        if (climateBusy) return;  // don't let a stale poll flicker over the tap
-        try {
-            const response = await fetch("{{ url_for('api_state') }}", {cache: "no-store"});
-            if (!response.ok) return;
-            const d = await response.json();
-
-            const active = !!d.alarm_active;
-            alarmCard.classList.toggle("alarm-on", active);
-            alarmValue.textContent = active ? "TRIGGERED" : "ALL CLEAR";
-            setClass(alarmValue, ["on", "off"], active ? "off" : "on");
-            // Sound follows the same two fields the blinking red light and
-            // the "Siren manually silenced" tag already use - triggered
-            // while active, silenced when the homeowner mutes it.
-            setSirenSounding(active && !d.siren_muted);
-
-            const layers = Array.isArray(d.alarm_layers) ? d.alarm_layers : [];
-            alarmDetails.innerHTML = active
-                ? ((d.last_detection || "Active breach") +
-                   (d.siren_muted ? '<br><span class="muted-tag">🔇 Siren manually silenced</span>' : ""))
-                : "Gate, Door &amp; Gas layers combined";
-
-            gateValue.textContent = d.gate_status || "SECURE";
-            setClass(gateValue, ["secure", "breach"], d.gate_status === "SECURE" ? "secure" : "breach");
-
-            doorValue.textContent = d.door_status || "ALL CLOSED";
-            setClass(doorValue, ["secure", "breach"], d.door_status === "ALL CLOSED" ? "secure" : "breach");
-
-            gasValue.textContent = String(d.gas_level ?? 0) + "%";
-            setClass(gasValue, ["safe", "dangerous"], d.gas_status === "SAFE" ? "safe" : "dangerous");
-            gasStatus.textContent = "Status: " + (d.gas_status || "SAFE");
-
-            tempValue.textContent = String(d.temperature ?? 0) + "°C";
-            setClass(tempValue, ["normal", "high", "low"], String(d.temp_status || "NORMAL").toLowerCase());
-            tempStatus.textContent = "Status: " + (d.temp_status || "NORMAL") + " (AC/Heater auto-respond)";
-
-            // AC/heater is a DERIVED card. Its display follows the two
-            // authoritative source cards in this same API response:
-            // occupancy first, then temperature/weather. This prevents the
-            // appliance card from ever showing a stale decision while the
-            // source cards have already changed.
-            const home = !!d.someone_home;
-            const weather = String(d.temp_status || "NORMAL").trim().toLowerCase();
-            const forcedOff = d.override_mode === "all_off";
-            lastForcedOff = forcedOff;
-            const cMode = String(d.climate_mode || "AUTO").toUpperCase();
-            let desiredAc = "OFF";
-            let desiredHeater = "OFF";
-
-            // Same priority as the server: Force-OFF > homeowner climate
-            // switch (weather and occupancy ignored) > automatic.
-            if (!forcedOff) {
-                if (cMode === "AC") {
-                    desiredAc = "ON";
-                } else if (cMode === "HEATER") {
-                    desiredHeater = "ON";
-                } else if (cMode === "AUTO" && home) {
-                    if (weather === "high") {
-                        desiredAc = "ON";
-                    } else if (weather === "low") {
-                        desiredHeater = "ON";
-                    }
-                }
-            }
-            renderClimateMode(cMode, forcedOff);
-
-            acValue.textContent = "AC: " + desiredAc;
-            setClass(acValue, ["on", "off"], desiredAc === "ON" ? "on" : "off");
-            heaterValue.textContent = "Heater: " + desiredHeater;
-            setClass(heaterValue, ["on", "off"], desiredHeater === "ON" ? "on" : "off");
-
-            const cameraBreach = String(d.camera_status || "").includes("Unauthorised");
-            cameraValue.textContent = d.camera_status || "CLEAR";
-            setClass(cameraValue, ["breach", "clear"], cameraBreach ? "breach" : "clear");
-            cameraStatus.textContent = d.camera_last_seen || "No person detected";
-
-            occupancyValue.textContent = d.someone_home ? "SOMEONE HOME" : "EMPTY";
-            setClass(occupancyValue, ["on", "off"], d.someone_home ? "on" : "off");
-
-            lightValue.textContent = d.light_status || "OFF";
-            setClass(lightValue, ["on", "off"], d.light_status === "ON" ? "on" : "off");
-            lightStatus.textContent = d.light_reason || "";
-
-            updated.innerHTML = "Last updated: " + (d.last_updated || "waiting...") + " | Live updates enabled<br>" +
-                "Monitoring worker: <strong>" + (d.worker_status || "OFFLINE") + "</strong> | Heartbeat: " + (d.worker_heartbeat || "waiting...") +
-                " | Storage: " + (d.db_backend || "?");
-        } catch (error) {
-            // A temporary dashboard/API failure must not affect the security worker.
-        }
-    }
-
-    // --- Climate switch (OFF / AC / HEATER / AUTO) - instant, no reload --
-    // Same pattern as Silence Siren: fetch() POST, then re-poll the small
-    // JSON state straight away. The card is also updated optimistically the
-    // moment the option is tapped, so it responds before the network does;
-    // the real state from the server then confirms or corrects it.
-    const climateWrap = document.getElementById("climate-wrap");
-    const climateToggle = document.getElementById("climate-toggle");
-    const climateMenu = document.getElementById("climate-menu");
-    const climateNote = document.getElementById("climate-note");
-    const climateTag = document.getElementById("climate-tag");
-    const modeNote = document.getElementById("mode-note");
-    const climateLabels = { OFF: "OFF", AC: "AC", HEATER: "HEATER", AUTO: "Auto (weather decides)" };
-
-    function renderClimateMode(mode, forcedOff) {
-        if (climateNote) {
-            climateNote.textContent = (mode === "AUTO") ? climateLabels.AUTO : "Manual - " + mode;
-        }
-        if (climateTag) {
-            climateTag.textContent = (!forcedOff && mode !== "AUTO") ? "🎚️ Manual: " + mode : "";
-        }
-        if (modeNote) {
-            modeNote.textContent = forcedOff ? "Manual override (all appliances forced off)" : "Automatic";
-        }
-        if (climateMenu) {
-            climateMenu.querySelectorAll("button").forEach(b =>
-                b.classList.toggle("active", b.dataset.mode === mode));
-        }
-    }
-
-    function closeClimateMenu() {
-        if (!climateMenu) return;
-        climateMenu.classList.remove("open");
-        climateToggle.setAttribute("aria-expanded", "false");
-    }
-
-    if (climateToggle && climateMenu) {
-        climateToggle.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const open = climateMenu.classList.toggle("open");
-            climateToggle.setAttribute("aria-expanded", open ? "true" : "false");
-        });
-        document.addEventListener("click", (e) => {
-            if (!climateWrap.contains(e.target)) closeClimateMenu();
-        });
-
-        climateMenu.querySelectorAll("button").forEach(btn => {
-            btn.addEventListener("click", async () => {
-                const mode = btn.dataset.mode;
-                closeClimateMenu();
-
-                // optimistic, instant card update (server state corrects it next poll)
-                const ac = mode === "AC" ? "ON" : "OFF";
-                const heater = mode === "HEATER" ? "ON" : "OFF";
-                if (mode !== "AUTO" && !lastForcedOff) {
-                    acValue.textContent = "AC: " + ac;
-                    setClass(acValue, ["on", "off"], ac === "ON" ? "on" : "off");
-                    heaterValue.textContent = "Heater: " + heater;
-                    setClass(heaterValue, ["on", "off"], heater === "ON" ? "on" : "off");
-                }
-                renderClimateMode(mode, lastForcedOff);
-
-                climateBusy = true;
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 8000);
-                try {
-                    await fetch("{{ url_for('control_climate') }}", {
-                        method: "POST",
-                        credentials: "same-origin",
-                        headers: {
-                            "X-Requested-With": "fetch",
-                            "Content-Type": "application/x-www-form-urlencoded"
-                        },
-                        body: "mode=" + encodeURIComponent(mode),
-                        signal: controller.signal
-                    });
-                } catch (err) {
-                    // weak network - the regular 2s refresh recovers the true state
-                } finally {
-                    clearTimeout(timeout);
-                    climateBusy = false;
-                    refreshLiveState();
-                }
-            });
-        });
-    }
-    // ---------------------------------------------------------------------
-
-    // --- Instant Silence Siren (no full-page reload) --------------------
-    // Only this one button is changed, since it's the one that needs to
-    // work fast on a weak connection. It still calls the exact same
-    // /control/silence endpoint and the exact same mute_siren() logic on
-    // the server - nothing server-side changes. It just avoids reloading
-    // the whole page (HTML/CSS/JS) for a control that only flips one
-    // field, then immediately re-polls the small JSON state instead of
-    // waiting for the next scheduled 2-second refresh. If the network
-    // request itself fails or times out, it fails quietly - the regular
-    // 2-second refresh will still pick up the real state as soon as the
-    // connection is back, and no page reload was wasted trying.
-    const silenceForm = document.getElementById("silence-form");
-    if (silenceForm) {
-        silenceForm.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const btn = silenceForm.querySelector("button");
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = "🔇 Silencing...";
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8000);
-            try {
-                await fetch(silenceForm.action, {
-                    method: "POST",
-                    credentials: "same-origin",
-                    headers: { "X-Requested-With": "fetch" },
-                    signal: controller.signal
-                });
-            } catch (err) {
-                // Weak/lost network - stay quiet, next automatic refresh recovers.
-            } finally {
-                clearTimeout(timeout);
-                btn.disabled = false;
-                btn.textContent = originalText;
-                refreshLiveState();
-            }
-        });
-    }
-    // ---------------------------------------------------------------------
-
-    refreshLiveState();
-    setInterval(refreshLiveState, 2000);
+  render(last);
+  loadEvents();
+  poll();
+  setInterval(poll, 2000);
+  setInterval(loadEvents, 5000);
 })();
 </script>
-
 </body>
 </html>

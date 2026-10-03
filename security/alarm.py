@@ -193,6 +193,26 @@ def get_active_layers():
         return [name for name, breached in layer_status.items() if breached]
 
 
+def monitoring_paused():
+    """True while the homeowner has Security Mode OFF.
+
+    Every monitoring worker calls this at the top of a scan and skips the scan
+    when it returns True. The first time it sees the system OFF it also clears
+    this process's own alarm memory, so nothing stale re-appears on resume.
+    """
+    try:
+        from sensor_data import read_data, system_is_on
+        if system_is_on(read_data()):
+            return False
+    except Exception:
+        return False
+    with _alarm_lock:
+        stale = alarm_active or siren_muted or any(layer_status.values())
+    if stale:
+        reset_alarm_state()
+    return True
+
+
 def mute_siren():
     global siren_muted
     with _alarm_lock:

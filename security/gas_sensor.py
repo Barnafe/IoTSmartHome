@@ -3,8 +3,9 @@
 
 import random
 import time
+import wake
 from security.alert_system import send_alert, send_clear_status
-from security.alarm import set_layer_status
+from security.alarm import set_layer_status, monitoring_paused
 
 gas_layer = "Gas Leakage Detection"
 scan_interval = 15  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
@@ -27,6 +28,8 @@ def check_gas_level(gas_level):
 
 
 def scan_gas():
+    if monitoring_paused():
+        return
     gas_level = read_gas_level()
     status = check_gas_level(gas_level)
 
@@ -48,11 +51,9 @@ def monitor_gas(stop_event=None):
     print(" Layer 4, Gas Sensor - CONTINUOUS WORKER")
     print("------------------------------------------")
     while stop_event is None or not stop_event.is_set():
+        _gen = wake.generation()
         try:
             scan_gas()
         except Exception as e:
             print(f"  ⚠️ Gas worker error: {e}")
-        if stop_event:
-            stop_event.wait(scan_interval)
-        else:
-            time.sleep(scan_interval)
+        wake.nap(stop_event, scan_interval, _gen)

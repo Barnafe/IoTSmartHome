@@ -1,21 +1,62 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Incident #{{ event.id }}</title>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event #{{ event.id }} - Smart Home System</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
 <style>
-body{font-family:Arial;background:#0b1220;color:#e8eef7;margin:0}.wrap{max-width:850px;margin:auto;padding:30px}
-.card{background:#121d30;border:1px solid #243652;border-radius:12px;padding:24px}
-.row{display:grid;grid-template-columns:180px 1fr;border-bottom:1px solid #243652;padding:12px 0}
-pre{white-space:pre-wrap;background:#09101c;padding:15px;border-radius:8px}
-a{color:#7cc7ff}
-</style></head><body><div class="wrap">
-<a href="{{ url_for('history') }}">← History</a><h1>Incident / Event #{{ event.id }}</h1>
-<div class="card">
-<div class="row"><b>Time</b><span>{{ event.created_at }}</span></div>
-<div class="row"><b>Event</b><span>{{ event.event_type }}</span></div>
-<div class="row"><b>Severity</b><span>{{ event.severity }}</span></div>
-<div class="row"><b>Source</b><span>{{ event.source }}</span></div>
-<div class="row"><b>Location</b><span>{{ event.location or "—" }}</span></div>
-<div class="row"><b>Message</b><span>{{ event.message }}</span></div>
-<div class="row"><b>Snapshot</b><span>{{ event.snapshot_path or "No physical image attached to this simulation event." }}</span></div>
-<h3>Event Metadata</h3><pre>{{ event.metadata }}</pre>
-</div></div></body></html>
+  body{background:radial-gradient(1100px 520px at 90% -10%,rgba(8,70,150,.30),transparent 60%),var(--bg);min-height:100vh}
+  .wrap{max-width:1300px;margin:0 auto;padding:24px 22px 50px}
+  .topbar{background:var(--topbar);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:40}
+  .topbar .in{max-width:1300px;margin:0 auto;padding:0 22px;min-height:68px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+  .topbar .brand-logo{height:50px}
+  .tnav{display:flex;gap:6px;flex-wrap:wrap}
+  .tnav a{color:var(--soft);text-decoration:none;font-size:14px;padding:8px 13px;border-radius:8px}
+  .tnav a:hover,.tnav a.cur{background:rgba(15,219,250,.1);color:#fff}
+  .tone-bad{color:var(--red);border-color:rgba(249,23,58,.6);background:rgba(249,23,58,.1)}
+  .tone-warn{color:var(--amber);border-color:rgba(253,180,1,.55);background:rgba(253,180,1,.08)}
+  .tone-good{color:var(--green);border-color:rgba(0,245,155,.5);background:rgba(0,245,155,.08)}
+  .tone-info{color:var(--cyan);border-color:rgba(15,219,250,.5);background:rgba(15,219,250,.08)}
+  .chip{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid;white-space:nowrap;display:inline-block}
+
+  .wrap{max-width:900px}
+  .back{display:inline-block;margin-bottom:14px;color:var(--cyan);text-decoration:none;font-weight:600}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .card .top{padding:22px 26px;background:linear-gradient(135deg,#002a5c,#001a37 70%);border-bottom:1px solid var(--line2);display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .card .top .ic{width:54px;height:54px;border-radius:14px;background:var(--btn);display:grid;place-items:center;font-size:28px}
+  .card .top h1{margin:0;font-size:22px}.card .top small{color:var(--muted)}
+  .row{display:grid;grid-template-columns:170px 1fr;gap:12px;padding:14px 26px;border-bottom:1px solid rgba(11,45,82,.6)}
+  .row b{color:var(--muted);font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:.7px}
+  .row span{color:#fff;overflow-wrap:anywhere}
+  pre{margin:0;padding:18px 26px;color:var(--soft);background:#000b1a;white-space:pre-wrap;font-size:13px;overflow-wrap:anywhere}
+  h3{margin:0;padding:16px 26px 10px;color:var(--cyan);font-size:14px;text-transform:uppercase;letter-spacing:1px}
+  @media (max-width:560px){.wrap{padding:16px 12px}.row{grid-template-columns:1fr;gap:3px;padding:12px 16px}.card .top{padding:16px}h3,pre{padding-left:16px;padding-right:16px}}
+</style></head><body>
+<header class="topbar"><div class="in">
+  <a class="logo" href="{{ url_for('home') }}"><img class="brand-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="Barnafé Tech Services"></a>
+  <nav class="tnav">
+    <a href="{{ url_for('home') }}">🏠 Home</a>
+    <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>
+    <a class="cur" href="{{ url_for('history') }}">📚 History</a>
+    <a href="{{ url_for('guide') }}">📖 Guide</a>
+  </nav>
+</div></header>
+<div class="wrap">
+  <a class="back" href="{{ url_for('history') }}">← Back to History</a>
+  {% set tone = 'bad' if event.severity in ('critical','danger') else ('warn' if event.severity=='warning' else 'good') %}
+  {% set icons = {'security_breach':'🚨','security_clear':'✅','camera_detection':'📷','homeowner_control':'🎛️','energy_override':'💡','climate_override':'🌡️'} %}
+  <div class="card">
+    <div class="top"><span class="ic">{{ icons.get(event.event_type, '📋') }}</span>
+      <div style="flex:1"><h1>{{ event.event_type.replace('_',' ')|capitalize }}</h1><small>Event #{{ event.id }}</small></div>
+      <span class="chip tone-{{ tone }}">{{ event.severity|capitalize }}</span></div>
+    <div class="row"><b>Time</b><span><time id="when" datetime="{{ event.created_at }}">{{ event.created_at }}</time></span></div>
+    <div class="row"><b>Message</b><span>{{ event.message }}</span></div>
+    <div class="row"><b>Source</b><span>{{ event.source }}</span></div>
+    <div class="row"><b>Location</b><span>{{ event.location or "—" }}</span></div>
+    <div class="row"><b>Snapshot</b><span>{{ event.snapshot_path or "No physical image attached to this simulation event." }}</span></div>
+    <h3>Event details</h3>
+    <pre>{{ event.metadata|pretty_json }}</pre>
+  </div>
+</div>
+<script>
+const t=document.getElementById("when"),d=new Date(t.getAttribute("datetime"));
+if(!isNaN(d))t.textContent=d.toLocaleDateString([],{weekday:"long",day:"2-digit",month:"long",year:"numeric"})+" at "+d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+</script></body></html>

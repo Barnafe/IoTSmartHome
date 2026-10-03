@@ -1,0 +1,12 @@
+/* Shared Smart Home theme - colours sampled from the reference dashboard design */
+:root{
+  --bg:#000e22; --bg2:#001025; --topbar:#00122d; --card:#001329; --card2:#001a37;
+  --line:#0b2d52; --line2:#0f4a7a; --btn:#002c59;
+  --cyan:#0fdbfa; --green:#00f59b; --teal:#01d1a4; --amber:#fdb401; --orange:#fe9606;
+  --red:#f9173a; --blue:#028bd3; --text:#ffffff; --muted:#8fb4d3; --soft:#c9e6f7;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Segoe UI",Roboto,Arial,sans-serif;line-height:1.5}
+a{color:var(--cyan)}
+.brand-logo{height:44px;width:auto;display:block}

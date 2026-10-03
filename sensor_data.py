@@ -29,7 +29,10 @@ default_data = {
     "last_detection": "No active breach",
     "alarm_active": False,
     "siren_muted": False,
-    "override_mode": None,
+    "light_mode": "AUTO",
+    "gate_mode": "AUTO",
+    "door_mode": "AUTO",
+    "security_mode": "AUTO",
     "climate_mode": "AUTO",
     "last_updated": "waiting...",
     "worker_status": "OFFLINE",
@@ -72,25 +75,36 @@ def _save():
 
 
 
-VALID_CLIMATE_MODES = ("AUTO", "OFF", "AC", "HEATER")
+# Homeowner controls. Every device accepts AUTO ("resume normal"), which hands
+# the device back to the automatic system. Stored values are what the server keeps.
+CONTROL_MODES = {
+    "light":    ("light_mode",    ("AUTO", "ON", "OFF")),
+    "gate":     ("gate_mode",     ("AUTO", "OPEN", "CLOSED")),
+    "door":     ("door_mode",     ("AUTO", "OPEN", "CLOSED")),
+    "security": ("security_mode", ("AUTO", "ON", "OFF")),
+    "climate":  ("climate_mode",  ("AUTO", "OFF", "AC", "HEATER")),
+}
+VALID_CLIMATE_MODES = CONTROL_MODES["climate"][1]
+_MODE_ALIASES = {"CLOSE": "CLOSED", "RESUME": "AUTO", "NORMAL": "AUTO"}
 
 
-def _temperature_appliance_outputs(temp_status, someone_home, override_mode, climate_mode="AUTO"):
+def system_is_on(state):
+    """The whole system runs unless the homeowner set Security Mode to OFF."""
+    return str((state or {}).get("security_mode", "AUTO")).strip().upper() != "OFF"
+
+
+def _temperature_appliance_outputs(temp_status, someone_home, climate_mode="AUTO", system_on=True):
     """Return the only valid AC/heater decision.
 
     Priority (highest first):
-      1. Manual "Force All Appliances OFF" override -> both OFF.
-      2. Homeowner climate switch (OFF / AC / HEATER) -> obeyed as given,
-         regardless of weather AND occupancy (the homeowner is explicitly
-         commanding it, e.g. a fever on a hot day; a still person may not
-         trigger the PIR sensors).
+      1. System OFF (Security Mode OFF)        -> both OFF.
+      2. Homeowner AC/Heater choice (OFF/AC/HEATER) -> obeyed as given,
+         regardless of weather AND occupancy.
       3. AUTO (default): an empty house is OFF; otherwise the weather decides.
-    This function is deliberately pure so every state transition uses exactly
-    the same decision table.
+    Deliberately pure so every state transition uses the same decision table.
     """
-    if override_mode == "all_off":
+    if not system_on:
         return "OFF", "OFF"
-
     mode = str(climate_mode or "AUTO").strip().upper()
     if mode == "AC":
         return "ON", "OFF"
@@ -109,153 +123,124 @@ def _temperature_appliance_outputs(temp_status, someone_home, override_mode, cli
     return "OFF", "OFF"
 
 
-def _reconcile_climate_appliances(state):
-    """Synchronise ONLY the derived AC/heater outputs with source state.
+def _normalize(state):
+    """Derive every homeowner-controlled output from the source state.
 
-    Occupancy and temperature are the source conditions. AC/heater is derived
-    state and must never become an independent decision-maker. Keeping this
-    reconciliation in one helper prevents one update path from accidentally
-    leaving the appliance card stale.
+    Runs inside EVERY state write (sensor workers, web controls, either
+    process), so a control press and a sensor scan can never leave the
+    dashboard contradicting itself. Manual modes live in the state; sensors
+    only ever report facts.
     """
-    merged = dict(state) if isinstance(state, dict) else {}
-    ac, heater = _temperature_appliance_outputs(
-        merged.get("temp_status", "normal"),
-        bool(merged.get("someone_home", True)),
-        merged.get("override_mode"),
-        merged.get("climate_mode", "AUTO"),
-    )
-    merged["ac_status"] = ac
-    merged["heater_status"] = heater
-    return merged
+    m = dict(state) if isinstance(state, dict) else {}
+    on = system_is_on(m)
+    home = bool(m.get("someone_home", True))
 
+    # --- AC / Heater ---
+    m["ac_status"], m["heater_status"] = _temperature_appliance_outputs(
+        m.get("temp_status", "normal"), home, m.get("climate_mode", "AUTO"), on)
 
-def _reconcile_lights(state):
-    """Keep the LIGHTS card from contradicting the OCCUPANCY card in between
-    the energy worker's own scan cycles.
-
-    Occupancy (PIR) and the lights worker run as two independent workers on
-    their own timers, so occupancy can flip several seconds before the
-    lights worker's next scan re-reads it. It fixes the empty-house case
-    immediately (no reading needed), and - rather than leaving a stale
-    "no one is home" reason up on screen with a placeholder "checking..."
-    message until the energy worker's next scheduled scan (up to
-    `scan_interval` seconds away) - takes one immediate brightness reading
-    right now, using the exact same decision function the energy worker
-    itself uses (control_lights/read_brightness in
-    energy.appliance_control), so the LIGHTS card shows its real ON/OFF
-    result straight away instead of a placeholder. The energy worker's own
-    next scheduled scan still runs as normal afterwards and simply confirms
-    or refreshes this reading - nothing about its own timer or logic changes.
-    """
-    merged = dict(state) if isinstance(state, dict) else {}
-    if merged.get("override_mode") == "all_off":
-        return merged  # the override branch in scan_energy() already owns this text
-
-    if not bool(merged.get("someone_home", True)):
-        merged["light_status"] = "OFF"
-        merged["light_reason"] = "No one is home — energy saving mode (lights off)"
-    elif str(merged.get("light_reason", "")).startswith("No one is home"):
-        # Imported here (not at module top) to avoid a circular import,
-        # since energy.appliance_control itself imports from sensor_data.
+    # --- Lights ---
+    light_mode = str(m.get("light_mode", "AUTO")).upper()
+    reason = str(m.get("light_reason", ""))
+    if not on:
+        m["light_status"] = "OFF"
+        m["light_reason"] = "System is OFF — all automation paused"
+    elif light_mode == "ON":
+        m["light_status"] = "ON"
+        m["light_reason"] = "Manual — homeowner turned lights ON"
+    elif light_mode == "OFF":
+        m["light_status"] = "OFF"
+        m["light_reason"] = "Manual — homeowner turned lights OFF"
+    elif not home:
+        m["light_status"] = "OFF"
+        m["light_reason"] = "No one is home — energy saving mode (lights off)"
+    elif reason.startswith(("Manual", "System is OFF", "No one is home")):
+        # Back to automatic: take one fresh reading now instead of showing a
+        # stale manual/placeholder reason until the energy worker's next scan.
+        # Imported here (not at module top) to avoid a circular import.
         from energy.appliance_control import read_brightness, control_lights
-        light_status, light_reason = control_lights(read_brightness())
-        merged["light_status"] = light_status
-        merged["light_reason"] = light_reason
+        m["light_status"], m["light_reason"] = control_lights(read_brightness())
 
-    return merged
+    # --- Security layers ---
+    if not on:
+        m.update({
+            "alarm_active": False, "alarm_layers": [], "siren_muted": False,
+            "last_detection": "System OFF — monitoring paused",
+            "gate_status": "PAUSED", "door_status": "PAUSED", "gas_status": "PAUSED",
+            "camera_status": "PAUSED", "camera_last_seen": "System OFF",
+        })
+        return m
+
+    gate_mode = str(m.get("gate_mode", "AUTO")).upper()
+    door_mode = str(m.get("door_mode", "AUTO")).upper()
+    # Sensors only ever report SECURE/BREACH, so "OPEN" exists only while the
+    # homeowner holds the gate/door open; leaving that mode closes it again.
+    if gate_mode == "OPEN":
+        m["gate_status"] = "OPEN"
+    elif m.get("gate_status") == "OPEN":
+        m["gate_status"] = "SECURE"
+    if door_mode == "OPEN":
+        m["door_status"] = "OPEN"
+    elif m.get("door_status") == "OPEN":
+        m["door_status"] = "ALL CLOSED"
+
+    # An opening the homeowner commanded is authorised, never a breach.
+    if isinstance(m.get("alarm_layers"), list):
+        layers = [l for l in m["alarm_layers"]
+                  if not (l == "gate" and gate_mode == "OPEN")
+                  and not (l == "door" and door_mode == "OPEN")]
+        if layers != m["alarm_layers"]:
+            from security.alarm import LAYER_LABELS
+            m["alarm_layers"] = layers
+            m["last_detection"] = (" | ".join(LAYER_LABELS.get(l, l) for l in layers)
+                                   if layers else "No active breach")
+            if not layers:
+                m["alarm_active"] = False
+                m["siren_muted"] = False
+    return m
+
+
+def _commit(mutate):
+    """Apply ``mutate(dict)`` + normalisation to the shared state atomically."""
+    with _lock:
+        def _merge(current):
+            merged = dict(current) if isinstance(current, dict) else {}
+            mutate(merged)
+            merged = _normalize(merged)
+            merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            return merged
+        try:
+            new_state = update_runtime_state(_merge)
+            _state.clear()
+            _state.update(new_state)
+        except Exception as exc:
+            # Shared DB unavailable: keep security workers alive on the local
+            # cache; it re-syncs from the database on the next good call.
+            local = _merge(_state)
+            _state.clear()
+            _state.update(local)
+            print(f"  ⚠️ Shared live-state persistence unavailable: {exc}")
+        _save_local_cache()
+        return dict(_state)
 
 
 def update_temperature_state(temperature, temp_status):
     """Publish temperature and appliance response as one atomic state change."""
-    with _lock:
-        def _merge(current):
-            merged = dict(current) if isinstance(current, dict) else {}
-            merged.update({
-                "temperature": temperature,
-                "temp_status": str(temp_status).upper(),
-            })
-            merged = _reconcile_climate_appliances(merged)
-            merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            return merged
-
-        try:
-            new_state = update_runtime_state(_merge)
-            _state.clear()
-            _state.update(new_state)
-        except Exception as exc:
-            _state.update({"temperature": temperature, "temp_status": str(temp_status).upper()})
-            _state.update(_reconcile_climate_appliances(_state))
-            _state["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"  ⚠️ Shared live-state persistence unavailable: {exc}")
-        _save_local_cache()
-        return dict(_state)
+    return _commit(lambda m: m.update({
+        "temperature": temperature, "temp_status": str(temp_status).upper()}))
 
 
 def update_occupancy_state(someone_home):
-    """Publish occupancy and immediately reconcile AC/heater with current temperature."""
-    with _lock:
-        def _merge(current):
-            merged = dict(current) if isinstance(current, dict) else {}
-            merged["someone_home"] = bool(someone_home)
-            merged = _reconcile_climate_appliances(merged)
-            merged = _reconcile_lights(merged)
-            merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            return merged
+    """Publish occupancy and immediately reconcile appliances."""
+    return _commit(lambda m: m.update({"someone_home": bool(someone_home)}))
 
-        try:
-            new_state = update_runtime_state(_merge)
-            _state.clear()
-            _state.update(new_state)
-        except Exception as exc:
-            _state["someone_home"] = bool(someone_home)
-            _state.update(_reconcile_climate_appliances(_state))
-            _state.update(_reconcile_lights(_state))
-            _state["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"  ⚠️ Shared live-state persistence unavailable: {exc}")
-        _save_local_cache()
-        return dict(_state)
 
 def update_data(key, value):
     update_multiple({key: value})
 
 
 def update_multiple(updates):
-    with _lock:
-        def _merge(current):
-            merged = dict(current) if isinstance(current, dict) else {}
-            merged.update(updates)
-            # Climate is derived state. If any generic caller changes one of
-            # its source conditions, update AC/heater in this SAME transaction.
-            if any(key in updates for key in (
-                "someone_home", "temp_status", "temperature", "override_mode",
-                "climate_mode"
-            )):
-                merged = _reconcile_climate_appliances(merged)
-            if "someone_home" in updates or "override_mode" in updates:
-                merged = _reconcile_lights(merged)
-            merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            return merged
-
-        try:
-            # update_runtime_state() reads the CURRENT shared row and
-            # writes the merged result back inside one locked transaction,
-            # so a concurrent write from another thread or another process
-            # (e.g. the web service vs. the background worker) cannot be
-            # silently lost the way two separate read-then-write calls
-            # could lose it.
-            new_state = update_runtime_state(_merge)
-            _state.clear()
-            _state.update(new_state)
-        except Exception as exc:
-            # The shared database is temporarily unavailable - fall back to
-            # merging directly onto this process's local cache so security
-            # workers keep running. This is best-effort only: it re-syncs
-            # from the database automatically on the next successful call.
-            _state.update(updates)
-            _state["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"  ⚠️ Shared live-state persistence unavailable: {exc}")
-
-        _save_local_cache()
+    return _commit(lambda m: m.update(updates))
 
 
 def read_data():
@@ -294,64 +279,40 @@ def reset_data():
         _save()
 
 
-def set_override(mode):
-    """Change override and immediately reconcile temperature appliances."""
-    with _lock:
-        def _merge(current):
-            merged = dict(current) if isinstance(current, dict) else {}
-            merged["override_mode"] = mode
-            merged = _reconcile_climate_appliances(merged)
-            merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            return merged
-        try:
-            new_state = update_runtime_state(_merge)
-            _state.clear(); _state.update(new_state)
-        except Exception as exc:
-            _state["override_mode"] = mode
-            _state.update(_reconcile_climate_appliances(_state))
-            _state["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"  ⚠️ Shared live-state persistence unavailable: {exc}")
-        _save_local_cache()
+def set_mode(device, mode):
+    """Homeowner control: set one device to one of its modes (or AUTO).
 
+    Returns the new full state. Raises ValueError for an unknown device/mode."""
+    if device not in CONTROL_MODES:
+        raise ValueError(f"Unknown control: {device}")
+    key, allowed = CONTROL_MODES[device]
+    mode = str(mode or "").strip().upper()
+    mode = _MODE_ALIASES.get(mode, mode)
+    if mode not in allowed:
+        raise ValueError(f"Invalid {device} mode: {mode}")
 
-def clear_override():
-    set_override(None)
+    def _mutate(m):
+        was_off = not system_is_on(m)
+        m[key] = mode
+        if device == "security" and was_off and mode != "OFF":
+            # Coming back on: show a clean normal board until each sensor's
+            # next scan reports its real reading.
+            m.update({
+                "alarm_active": False, "alarm_layers": [], "siren_muted": False,
+                "last_detection": "No active breach",
+                "gate_status": "SECURE", "door_status": "ALL CLOSED", "gas_status": "SAFE",
+                "camera_status": "CLEAR", "camera_last_seen": "No person detected",
+            })
+    return _commit(_mutate)
 
 
 def set_climate_mode(mode):
-    """Homeowner climate switch: AUTO / OFF / AC / HEATER.
-
-    Changes the mode and re-derives AC/heater in the SAME atomic state update,
-    so the dashboard sees the new result on its very next poll."""
-    mode = str(mode or "AUTO").strip().upper()
-    if mode not in VALID_CLIMATE_MODES:
-        raise ValueError(f"Invalid climate mode: {mode}")
-    with _lock:
-        def _merge(current):
-            merged = dict(current) if isinstance(current, dict) else {}
-            merged["climate_mode"] = mode
-            merged = _reconcile_climate_appliances(merged)
-            merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            return merged
-        try:
-            new_state = update_runtime_state(_merge)
-            _state.clear(); _state.update(new_state)
-        except Exception as exc:
-            _state["climate_mode"] = mode
-            _state.update(_reconcile_climate_appliances(_state))
-            _state["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
-            print(f"  ⚠️ Shared live-state persistence unavailable: {exc}")
-        _save_local_cache()
-        return dict(_state)
+    return set_mode("climate", mode)
 
 
-def get_override():
-    with _lock:
-        try:
-            shared = get_runtime_state()
-        except Exception:
-            shared = None
-        if isinstance(shared, dict):
-            _state.clear()
-            _state.update(shared)
-        return _state.get("override_mode")
+def reset_manual_modes():
+    """A fresh system start always begins fully automatic."""
+    def _mutate(m):
+        for key, _ in CONTROL_MODES.values():
+            m[key] = "AUTO"
+    return _commit(_mutate)

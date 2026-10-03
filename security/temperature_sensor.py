@@ -3,8 +3,10 @@
 
 import random
 import time
+import wake
 from security.alert_system import send_alert, send_clear_status
 from sensor_data import update_temperature_state
+from security.alarm import monitoring_paused
 
 temp_layer = "Temperature & Fire Detection"
 scan_interval = 15  # seconds - slow enough for a human to read each state change on the dashboard before it updates again
@@ -30,6 +32,8 @@ def check_temperature(temp):
 
 
 def scan_temperature():
+    if monitoring_paused():
+        return None
     temp = read_temperature()
     status = check_temperature(temp)
 
@@ -51,11 +55,9 @@ def monitor_temperature(stop_event=None):
     print(" Temperature Sensor - CONTINUOUS WORKER")
     print("------------------------------------------")
     while stop_event is None or not stop_event.is_set():
+        _gen = wake.generation()
         try:
             scan_temperature()
         except Exception as e:
             print(f"  ⚠️ Temperature worker error: {e}")
-        if stop_event:
-            stop_event.wait(scan_interval)
-        else:
-            time.sleep(scan_interval)
+        wake.nap(stop_event, scan_interval, _gen)

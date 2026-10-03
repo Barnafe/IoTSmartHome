@@ -3,8 +3,10 @@
 
 import random
 import time
+import wake
 from security.alert_system import send_alert, send_clear_status
-from security.alarm import set_layer_status
+from security.alarm import set_layer_status, monitoring_paused
+from sensor_data import read_data
 
 doors = ["Front Door", "Back Door"]
 door_layer = "Layer 2 - Doors"
@@ -20,6 +22,12 @@ def check_door_status():
 
 
 def scan_doors():
+    if monitoring_paused():
+        return
+    if str(read_data().get("door_mode", "AUTO")).upper() == "OPEN":
+        # Homeowner opened the door(s): authorised, so it is not a breach.
+        set_layer_status("door", False, state_updates={"door_status": "OPEN"})
+        return
     door_breach = False
     breach_reasons = []
 
@@ -54,11 +62,9 @@ def monitor_doors(stop_event=None):
     print(" Layer 2, Door Sensor - CONTINUOUS WORKER")
     print("------------------------------------------")
     while stop_event is None or not stop_event.is_set():
+        _gen = wake.generation()
         try:
             scan_doors()
         except Exception as e:
             print(f"  ⚠️ Door worker error: {e}")
-        if stop_event:
-            stop_event.wait(scan_interval)
-        else:
-            time.sleep(scan_interval)
+        wake.nap(stop_event, scan_interval, _gen)

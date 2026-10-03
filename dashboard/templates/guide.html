@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Guide - Barnafé Tech Smart Home System</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+<style>
+  body{background:radial-gradient(1000px 500px at 85% -5%,rgba(8,70,150,.35),transparent 60%),var(--bg)}
+  .top{position:sticky;top:0;z-index:30;background:rgba(0,18,45,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .top .in{max-width:1280px;margin:0 auto;padding:0 24px;height:68px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .top .brand-logo{height:56px}
+  .top nav{display:flex;gap:10px;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:999px;border:1px solid var(--line2);
+    background:var(--btn);color:var(--soft);text-decoration:none;font-size:14px;font-weight:600}
+  .pill:hover{border-color:var(--cyan);color:#fff}
+  .pill.primary{background:linear-gradient(180deg,#14b8ff,#0877e6);color:#fff;border-color:#6fd6ff}
+
+  .layout{max-width:1280px;margin:0 auto;padding:32px 24px 60px;display:grid;grid-template-columns:260px 1fr;gap:36px}
+  .side{position:sticky;top:90px;align-self:start;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .side h4{margin:0 0 10px;color:var(--cyan);font-size:12px;letter-spacing:1.5px;text-transform:uppercase}
+  .side a{display:flex;gap:10px;align-items:center;padding:9px 10px;border-radius:8px;color:var(--soft);text-decoration:none;font-size:14.5px}
+  .side a b{width:24px;height:24px;border-radius:7px;background:var(--btn);color:var(--cyan);display:grid;place-items:center;font-size:12px}
+  .side a:hover,.side a.on{background:rgba(15,219,250,.1);color:#fff}
+  .side a.on b{background:var(--cyan);color:#001025}
+
+  .hero{background:linear-gradient(135deg,#002a5c,#001a37 60%,#001329);border:1px solid var(--line2);border-radius:18px;padding:34px 36px;margin-bottom:28px}
+  .hero h1{margin:0 0 8px;font-size:34px}
+  .hero h1 span{color:var(--cyan)}
+  .hero p{margin:0;color:var(--soft);font-size:17px;max-width:720px}
+
+  section{margin-bottom:34px;scroll-margin-top:90px}
+  h2{font-size:25px;margin:0 0 6px;display:flex;align-items:center;gap:12px}
+  h2 .num{width:34px;height:34px;border-radius:10px;background:var(--cyan);color:#001025;display:grid;place-items:center;font-size:16px;font-weight:800}
+  .lead{color:var(--muted);margin:0 0 18px;font-size:15.5px}
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:repeat(3,1fr)}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px}
+  .box h3{margin:0 0 8px;font-size:17px;color:#fff;display:flex;align-items:center;gap:10px}
+  .box p{margin:0;color:var(--soft);font-size:15px}
+  .ico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:18px;background:var(--btn)}
+
+  .steps{counter-reset:s;display:grid;gap:14px}
+  .step{display:flex;gap:16px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .step:before{counter-increment:s;content:counter(s);flex:0 0 38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#14b8ff,#0877e6);
+    display:grid;place-items:center;font-weight:800}
+  .step h3{margin:0 0 4px;font-size:17px}.step p{margin:0;color:var(--soft);font-size:15px}
+
+  .ctl{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:14px;overflow:hidden}
+  .ctl header{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--card2);border-bottom:1px solid var(--line)}
+  .ctl header h3{margin:0;font-size:18px}.ctl header span{color:var(--muted);font-size:14px;margin-left:auto}
+  .opt{display:grid;grid-template-columns:150px 1fr;gap:14px;padding:12px 18px;border-top:1px solid rgba(11,45,82,.6);align-items:start}
+  .opt:first-of-type{border-top:0}
+  .tag{display:inline-block;padding:5px 12px;border-radius:8px;font-weight:700;font-size:13px;text-align:center;border:1px solid var(--line2);background:var(--btn);color:var(--cyan)}
+  .tag.on{color:#001025;background:var(--green);border-color:var(--green)}
+  .tag.off{color:#fff;background:#8a1028;border-color:var(--red)}
+  .tag.auto{color:#001025;background:var(--cyan);border-color:var(--cyan)}
+  .opt p{margin:0;color:var(--soft);font-size:15px}
+
+  .note{display:flex;gap:12px;padding:14px 18px;border-radius:12px;background:rgba(15,219,250,.07);border:1px solid rgba(15,219,250,.35);color:var(--soft);font-size:15px;margin-top:14px}
+  .note.warn{background:rgba(253,180,1,.08);border-color:rgba(253,180,1,.45)}
+  .note b{color:#fff}
+
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14.5px}
+  th{background:var(--card2);color:var(--cyan);text-align:left;padding:11px 14px;font-size:12.5px;letter-spacing:1px;text-transform:uppercase}
+  td{padding:11px 14px;border-top:1px solid var(--line);color:var(--soft);vertical-align:top}
+  td:first-child{color:#fff;font-weight:600;white-space:nowrap}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+
+  .flow{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap}
+  .flow .n{flex:1 1 150px;background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:14px;text-align:center}
+  .flow .n b{display:block;color:var(--cyan);margin-bottom:4px}.flow .n span{color:var(--soft);font-size:13.5px}
+  .flow .ar{align-self:center;color:var(--cyan);font-size:22px}
+
+  details{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
+  summary{cursor:pointer;padding:15px 18px;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:12px}
+  summary::-webkit-details-marker{display:none}
+  summary:after{content:"+";color:var(--cyan);font-size:22px;line-height:1}
+  details[open] summary:after{content:"–"}
+  details[open] summary{border-bottom:1px solid var(--line);color:var(--cyan)}
+  details p{margin:0;padding:14px 18px;color:var(--soft);font-size:15px}
+
+  .contact{display:flex;gap:26px;align-items:center;background:linear-gradient(135deg,#002a5c,#001329);border:1px solid var(--line2);border-radius:16px;padding:24px 28px;flex-wrap:wrap}
+  .contact img{height:84px}
+  .contact ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+  .contact li{color:var(--soft)}.contact li b{color:var(--cyan);display:inline-block;min-width:92px}
+  .contact a{color:#fff;text-decoration:none;font-weight:600}
+
+  @media (max-width:980px){
+    .layout{grid-template-columns:1fr;padding:20px 16px 50px}
+    .side{position:static;display:flex;gap:6px;overflow-x:auto;padding:10px}
+    .side h4{display:none}.side a{white-space:nowrap;flex:0 0 auto}
+    .g2,.g3{grid-template-columns:1fr}
+    .opt{grid-template-columns:1fr;gap:6px}
+    .hero{padding:24px 20px}.hero h1{font-size:26px}
+    .top .brand-logo{height:38px}.pill{padding:7px 12px;font-size:13px}
+    table{display:block;overflow-x:auto}
+  }
+</style>
+</head>
+<body>
+
+<div class="top"><div class="in">
+  <a href="{{ url_for('home') }}"><img class="brand-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="Barnafé Tech Services"></a>
+  <nav>
+    <a class="pill" href="{{ url_for('home') }}">🏠 Home</a>
+    <a class="pill primary" href="{{ url_for('dashboard') }}">📊 Open Dashboard</a>
+  </nav>
+</div></div>
+
+<div class="layout">
+  <aside class="side" id="side">
+    <h4>On this page</h4>
+    <a href="#start" class="on"><b>1</b>Quick start</a>
+    <a href="#tour"><b>2</b>Dashboard tour</a>
+    <a href="#controls"><b>3</b>Homeowner controls</a>
+    <a href="#alarm"><b>4</b>Alarm &amp; siren</a>
+    <a href="#how"><b>5</b>How it works</a>
+    <a href="#colours"><b>6</b>Status colours</a>
+    <a href="#faq"><b>7</b>Troubleshooting</a>
+    <a href="#help"><b>8</b>Get help</a>
+  </aside>
+
+  <main>
+    <div class="hero">
+      <h1>System <span>Guide</span></h1>
+      <p>Everything you need to use your Smart Home System: what each card shows, what every button does, and how the system makes its decisions.</p>
+    </div>
+
+    <section id="start">
+      <h2><span class="num">1</span>Quick start</h2>
+      <p class="lead">You can be up and running in three steps.</p>
+      <div class="steps">
+        <div class="step"><div><h3>Open the dashboard</h3><p>On the home page press the big <b>Process</b> button. The monitoring dashboard opens and starts updating by itself every couple of seconds. You never need to refresh the page.</p></div></div>
+        <div class="step"><div><h3>Read the status</h3><p>The <b>Home Status</b> banner at the top tells you everything at a glance: <b>SECURE</b> (all normal), <b>ALERT</b> (a breach is active) or <b>SYSTEM OFF</b>. The tiles below show each sensor.</p></div></div>
+        <div class="step"><div><h3>Take control when you need to</h3><p>Use the <b>Homeowner Controls</b> panel to switch lights, open or close the gate and doors, choose AC or Heater, or turn the whole system on or off. Every button works instantly, with no page reload.</p></div></div>
+      </div>
+      <div class="note"><span>💡</span><span><b>Good to know:</b> every time the system starts, everything is on <b>automatic</b>. Your manual choices only apply after you press a button, and <b>Resume normal</b> always hands control back to the system.</span></div>
+    </section>
+
+    <section id="tour">
+      <h2><span class="num">2</span>Dashboard tour</h2>
+      <p class="lead">What each part of the dashboard shows.</p>
+      <div class="grid g2">
+        <div class="box"><h3><span class="ico">🛡️</span>Home Status</h3><p>The overall verdict: SECURE, ALERT or SYSTEM OFF. It turns red when the alarm is active.</p></div>
+        <div class="box"><h3><span class="ico">🌡️</span>House Temperature</h3><p>The current temperature with a plain-word condition (Comfortable, Hot or Cold). Hot above 35°C, cold below 18°C.</p></div>
+        <div class="box"><h3><span class="ico">🚪</span>Gate &amp; Door</h3><p>SECURE / ALL CLOSED when quiet, BREACH when the sensors detect movement or an unexpected opening, OPEN when you opened it yourself.</p></div>
+        <div class="box"><h3><span class="ico">🏠</span>Occupancy</h3><p>Whether anyone is home, from the indoor motion sensors. An empty house switches the lights off and, in automatic mode, the AC and heater.</p></div>
+        <div class="box"><h3><span class="ico">📷</span>Camera</h3><p>CLEAR or an "unauthorised person" notice. The camera records the event in History but does not sound the alarm.</p></div>
+        <div class="box"><h3><span class="ico">💨</span>Gas Level</h3><p>The gas reading as a percentage. Above 30% is DANGEROUS and triggers the alarm.</p></div>
+        <div class="box"><h3><span class="ico">💡</span>Lights &amp; ❄️ AC/Heater</h3><p>The live state of each appliance, with the reason shown for lights and a <b>Manual</b> tag whenever you are controlling them.</p></div>
+        <div class="box"><h3><span class="ico">📋</span>Recent Activity &amp; Incidents</h3><p>The latest events as they happen. Open <b>View All</b> for the full searchable History, which you can also export as CSV.</p></div>
+      </div>
+    </section>
+
+    <section id="controls">
+      <h2><span class="num">3</span>Homeowner controls</h2>
+      <p class="lead">Each control has the same simple idea: take over manually, or press <b>Resume normal</b> to give it back to the automatic system.</p>
+
+      <div class="ctl"><header><span class="ico">💡</span><h3>Light</h3><span>Lights, all rooms</span></header>
+        <div class="opt"><div><span class="tag on">ON</span></div><p>Lights stay on, whatever the brightness or occupancy.</p></div>
+        <div class="opt"><div><span class="tag off">OFF</span></div><p>Lights stay off, even if it is dark.</p></div>
+        <div class="opt"><div><span class="tag auto">Resume normal</span></div><p>Automatic again: lights come on when brightness drops below 30% and someone is home, and go off in an empty house.</p></div>
+      </div>
+
+      <div class="ctl"><header><span class="ico">🚪</span><h3>Gate</h3><span>Main gate</span></header>
+        <div class="opt"><div><span class="tag on">OPEN</span></div><p>You are opening the gate yourself. It shows <b>OPEN</b> and is treated as authorised, so it will not trigger a breach alarm while you hold it open.</p></div>
+        <div class="opt"><div><span class="tag off">CLOSE</span></div><p>The gate is closed and the sensor keeps guarding it. Any new movement or opening is still a breach.</p></div>
+        <div class="opt"><div><span class="tag auto">Resume normal</span></div><p>Back to fully automatic sensor monitoring.</p></div>
+      </div>
+
+      <div class="ctl"><header><span class="ico">🚪</span><h3>Door</h3><span>Front &amp; back doors</span></header>
+        <div class="opt"><div><span class="tag on">OPEN</span></div><p>Same as the gate: you are opening the doors, so it is authorised and will not raise an alarm.</p></div>
+        <div class="opt"><div><span class="tag off">CLOSE</span></div><p>Doors are closed and still guarded by their sensors.</p></div>
+        <div class="opt"><div><span class="tag auto">Resume normal</span></div><p>Back to automatic monitoring.</p></div>
+      </div>
+
+      <div class="ctl"><header><span class="ico">🛡️</span><h3>Security Mode</h3><span>The entire system</span></header>
+        <div class="opt"><div><span class="tag on">ON</span></div><p>The whole system is armed and running: sensors scan, the alarm can trigger and appliances follow their rules.</p></div>
+        <div class="opt"><div><span class="tag off">OFF</span></div><p>Switches the <b>entire system off immediately</b>. Monitoring pauses, any active alarm is cleared, and lights, AC and heater go off. Cards show <b>PAUSED</b>. Use this with care: nothing is protecting the home while it is off.</p></div>
+        <div class="opt"><div><span class="tag auto">Resume normal</span></div><p>Starts the system again in its normal armed state. Each sensor reports fresh readings within about 15 seconds.</p></div>
+      </div>
+
+      <div class="ctl"><header><span class="ico">❄️</span><h3>AC / Heater</h3><span>Climate</span></header>
+        <div class="opt"><div><span class="tag on">AC</span></div><p>AC on, heater off, regardless of the weather. Handy when you want cooling no matter what the sensor says.</p></div>
+        <div class="opt"><div><span class="tag on">HEATER</span></div><p>Heater on, AC off, regardless of the weather. For example, when you feel cold on a hot day because you are unwell.</p></div>
+        <div class="opt"><div><span class="tag off">OFF</span></div><p>Both AC and heater off.</p></div>
+        <div class="opt"><div><span class="tag auto">Resume normal</span></div><p>The weather decides again: AC when hot, heater when cold, both off when comfortable or when nobody is home.</p></div>
+      </div>
+
+      <div class="grid g2" style="margin-top:6px">
+        <div class="box"><h3><span class="ico">🔇</span>Silence Siren</h3><p>Stops the siren sound while the breach is still being monitored. The alarm resets itself once every layer is clear.</p></div>
+        <div class="box"><h3><span class="ico">📧</span>Send Test Email</h3><p>Sends a test alert to the homeowner's email so you can confirm that notifications are working.</p></div>
+      </div>
+      <div class="note warn"><span>⚠️</span><span><b>Priority order:</b> Security Mode OFF overrides everything. Your manual choices come next, and automatic logic only applies to controls set to <b>Resume normal</b>.</span></div>
+    </section>
+
+    <section id="alarm">
+      <h2><span class="num">4</span>Alarm &amp; siren</h2>
+      <p class="lead">What happens when something goes wrong.</p>
+      <div class="steps">
+        <div class="step"><div><h3>A breach is detected</h3><p>The gate sensor, door sensors or gas sensor report a problem. The Home Status turns red, the alarm card blinks and the siren sounds with a "pim-pim" tone. An alert email is sent to the homeowner.</p></div></div>
+        <div class="step"><div><h3>Silence the siren if needed</h3><p>Press <b>Silence Siren</b>. The sound stops immediately, but the breach stays on the dashboard and keeps being monitored.</p></div></div>
+        <div class="step"><div><h3>The alarm resets by itself</h3><p>When every layer is clear again, the alarm returns to ALL CLEAR and you are notified.</p></div></div>
+      </div>
+      <div class="note"><span>🔊</span><span><b>Siren sound:</b> browsers only allow sound after you have tapped or clicked the page once. After that first tap, the siren plays automatically.</span></div>
+    </section>
+
+    <section id="how">
+      <h2><span class="num">5</span>How the system works</h2>
+      <p class="lead">Every part of the home is watched by its own independent worker, so one slow sensor can never hold up another.</p>
+      <div class="flow">
+        <div class="n"><b>Sensors</b><span>Gate, doors, rooms, camera, gas, temperature, light</span></div><div class="ar">➜</div>
+        <div class="n"><b>Workers</b><span>Each scans on its own, about every 15 seconds</span></div><div class="ar">➜</div>
+        <div class="n"><b>Shared state</b><span>One live record of the whole home</span></div><div class="ar">➜</div>
+        <div class="n"><b>Dashboard</b><span>Refreshes every 2 seconds, and instantly when you press a control</span></div>
+      </div>
+      <div style="height:16px"></div>
+      <table>
+        <tr><th>Decision</th><th>Rule</th></tr>
+        <tr><td>Alarm</td><td>Triggers when the gate, door or gas layer is breached. Camera and occupancy never trigger it.</td></tr>
+        <tr><td>Lights (automatic)</td><td>ON when someone is home and brightness is below 30%. OFF when bright or when nobody is home.</td></tr>
+        <tr><td>AC (automatic)</td><td>ON when someone is home and the temperature is above 35°C.</td></tr>
+        <tr><td>Heater (automatic)</td><td>ON when someone is home and the temperature is below 18°C.</td></tr>
+        <tr><td>Gas</td><td>Dangerous above 30%.</td></tr>
+        <tr><td>Worker status</td><td>The system overview shows ONLINE while the monitoring worker keeps reporting its heartbeat.</td></tr>
+      </table>
+    </section>
+
+    <section id="colours">
+      <h2><span class="num">6</span>Status colours</h2>
+      <p class="lead">The colours mean the same thing everywhere.</p>
+      <table>
+        <tr><th>Colour</th><th>Meaning</th></tr>
+        <tr><td><span class="dot" style="background:#00f59b"></span>Green</td><td>Normal, secure, ON or healthy.</td></tr>
+        <tr><td><span class="dot" style="background:#0fdbfa"></span>Cyan</td><td>Information, active selection or a live value.</td></tr>
+        <tr><td><span class="dot" style="background:#fdb401"></span>Amber</td><td>Attention: manual mode, siren silenced or a caution.</td></tr>
+        <tr><td><span class="dot" style="background:#f9173a"></span>Red</td><td>Breach, danger or alarm active.</td></tr>
+        <tr><td><span class="dot" style="background:#5d7a96"></span>Grey</td><td>Paused: the system is switched off.</td></tr>
+      </table>
+    </section>
+
+    <section id="faq">
+      <h2><span class="num">7</span>Troubleshooting</h2>
+      <p class="lead">Quick answers to common questions.</p>
+      <details><summary>The dashboard says the worker is OFFLINE</summary><p>The monitoring worker has stopped or has not reported for 30 seconds. Check that the worker service is running, then wait a few seconds for the heartbeat to return.</p></details>
+      <details><summary>I pressed Security Mode OFF and the cards say PAUSED</summary><p>That is expected: the whole system is off. Press <b>ON</b> or <b>Resume normal</b> on Security Mode to start it again.</p></details>
+      <details><summary>I opened the gate but nothing sounded. Is it broken?</summary><p>No. A gate you open with the control is authorised, so it does not raise an alarm. Press <b>CLOSE</b> or <b>Resume normal</b> when done.</p></details>
+      <details><summary>My lights did not change when it got dark</summary><p>Check whether Light shows a <b>Manual</b> tag. If it does, press <b>Resume normal</b> so the system can decide again.</p></details>
+      <details><summary>The siren has no sound</summary><p>Tap or click anywhere on the page once, because browsers block sound until you interact. Also check that the siren has not been silenced and your device volume is up.</p></details>
+      <details><summary>I did not receive the alert email</summary><p>Press <b>Send Test Email</b>. If it fails, the email service key or recipient address is not set correctly for the deployment.</p></details>
+    </section>
+
+    <section id="help">
+      <h2><span class="num">8</span>Get help</h2>
+      <p class="lead">Need support or want a system like this? Reach out to us.</p>
+      <div class="contact">
+        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Barnafé Tech Services">
+        <ul>
+          <li><b>WhatsApp</b> <a href="https://wa.me/2348085532197">08085532197</a></li>
+          <li><b>Phone</b> <a href="tel:08145028220">08145028220</a></li>
+          <li><b>Email</b> <a href="mailto:yaasabrns@gmail.com">yaasabrns@gmail.com</a></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  const links=[...document.querySelectorAll('#side a')];
+  const secs=links.map(a=>document.querySelector(a.getAttribute('href')));
+  function spy(){
+    let cur=0;
+    secs.forEach((s,i)=>{ if(s.getBoundingClientRect().top<140) cur=i; });
+    links.forEach((a,i)=>a.classList.toggle('on',i===cur));
+  }
+  addEventListener('scroll',spy,{passive:true}); spy();
+})();
+</script>
+</body>
+</html>

@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
-from sensor_data import read_data, set_override, clear_override, set_climate_mode, VALID_CLIMATE_MODES
+from sensor_data import read_data, set_mode, CONTROL_MODES
 from database import log_event, init_db, get_events, get_event, get_stats, clear_history, get_backend
 from security.alarm import mute_siren
 from notify import notification_manager
@@ -125,9 +125,33 @@ def _augment_diagnostics(data):
     return data
 
 
+@app.template_filter("pretty_json")
+def pretty_json(value):
+    import json
+    if value in (None, "", "{}", {}):
+        return "No extra details recorded."
+    try:
+        obj = json.loads(value) if isinstance(value, str) else value
+        return json.dumps(obj, indent=2, ensure_ascii=False)
+    except Exception:
+        return str(value)
+
+
 # ---- routes ----
 
 @app.route("/")
+def home():
+    """Landing page. 'Process' leads to the monitoring dashboard."""
+    return render_template("home.html")
+
+
+@app.route("/guide")
+def guide():
+    """Illustrated system guide: what every card and control does."""
+    return render_template("guide.html")
+
+
+@app.route("/dashboard")
 def dashboard():
     data = _augment_diagnostics(read_data())
     # The worker publishes the authoritative live alarm/siren state to the
@@ -145,7 +169,7 @@ def history():
     event_type = request.args.get("type") or None
     severity = request.args.get("severity") or None
     events = get_events(250, event_type, severity)
-    return render_template("history.html", events=events,
+    return render_template("history.html", events=events, shown=len(events),
                            stats=get_stats(), selected_type=event_type or "",
                            selected_severity=severity or "")
 
@@ -190,57 +214,69 @@ def history_clear():
     flash("Persistent event history has been cleared.")
     return redirect(url_for("history"))
 
+def _wants_json():
+    return request.headers.get("X-Requested-With") == "fetch"
+
+
 @app.route("/control/silence", methods=["POST"])
 def control_silence():
     muted = mute_siren()
-    if muted:
-        flash("Siren silenced. The breach is still being monitored.")
-    else:
-        flash("Nothing to silence - no active breach right now.")
+    msg = ("Siren silenced. The breach is still being monitored." if muted
+           else "Nothing to silence - no active breach right now.")
+    if _wants_json():
+        return {"ok": True, "silenced": bool(muted), "message": msg,
+                "state": _augment_diagnostics(read_data())}
+    flash(msg)
     return redirect(url_for("dashboard"))
 
-@app.route("/control/off", methods=["POST"])
-def control_off():
-    set_override("all_off")
-    flash("Manual override activated - all appliances forced OFF.")
-    return redirect(url_for("dashboard"))
 
-@app.route("/control/climate", methods=["POST"])
-def control_climate():
-    """Homeowner climate switch: OFF / AC / HEATER, or AUTO to hand control
-    back to the weather. Works with a fetch() call (instant, JSON reply, no
-    page reload) and still degrades to a normal form post + redirect."""
+# Human-readable result of each homeowner control (toast + history entry).
+_CONTROL_LABELS = {
+    "light": {"ON": "Lights turned ON by homeowner.", "OFF": "Lights turned OFF by homeowner.",
+              "AUTO": "Lights back to automatic mode."},
+    "gate": {"OPEN": "Gate opened by homeowner (not treated as a breach).",
+             "CLOSED": "Gate closed by homeowner.", "AUTO": "Gate back to automatic monitoring."},
+    "door": {"OPEN": "Door opened by homeowner (not treated as a breach).",
+             "CLOSED": "Door closed by homeowner.", "AUTO": "Door back to automatic monitoring."},
+    "security": {"ON": "Security Mode ON - system armed.",
+                 "OFF": "Security Mode OFF - the entire system is switched off.",
+                 "AUTO": "Security Mode back to normal - system armed."},
+    "climate": {"AC": "AC forced ON (weather ignored).", "HEATER": "Heater forced ON (weather ignored).",
+                "OFF": "AC and Heater both OFF.", "AUTO": "AC/Heater back to automatic (weather decides)."},
+}
+
+
+@app.route("/control/<device>", methods=["POST"])
+def control_device(device):
+    """One endpoint for every homeowner control: light, gate, door, security, climate.
+
+    Called with fetch() by the dashboard (JSON reply, no page reload) and still
+    degrades to a normal form post + redirect."""
     mode = (request.form.get("mode") or "").strip().upper()
-    wants_json = request.headers.get("X-Requested-With") == "fetch"
-    if mode not in VALID_CLIMATE_MODES:
-        if wants_json:
+    if device not in CONTROL_MODES:
+        return {"ok": False, "error": "Unknown control"}, 404
+    try:
+        state = set_mode(device, mode)
+    except ValueError:
+        if _wants_json():
             return {"ok": False, "error": "Invalid mode"}, 400
-        flash("Invalid climate mode.")
+        flash("Invalid control option.")
         return redirect(url_for("dashboard"))
 
-    state = set_climate_mode(mode)
-    messages = {
-        "AC": "Climate switch: AC forced ON (weather ignored).",
-        "HEATER": "Climate switch: Heater forced ON (weather ignored).",
-        "OFF": "Climate switch: AC and Heater both OFF.",
-        "AUTO": "Climate switch: back to automatic (weather decides).",
-    }
+    mode = "CLOSED" if mode == "CLOSE" else ("AUTO" if mode in ("RESUME", "NORMAL") else mode)
+    message = _CONTROL_LABELS[device][mode]
     try:
-        log_event("climate_override", "info", "energy", "Entire House", messages[mode],
-                  metadata={"climate_mode": mode})
+        log_event("homeowner_control", "warning" if (device == "security" and mode == "OFF") else "info",
+                  "homeowner", "Entire House", message, metadata={"control": device, "mode": mode})
     except Exception as exc:
-        print(f"  ⚠️ Climate switch event log failed: {exc}")
+        print(f"  ⚠️ Control event log failed: {exc}")
 
-    if wants_json:
-        return {"ok": True, "climate_mode": mode,
-                "ac_status": state.get("ac_status"), "heater_status": state.get("heater_status")}
-    flash(messages[mode])
-    return redirect(url_for("dashboard"))
-
-@app.route("/control/resume", methods=["POST"])
-def control_resume():
-    clear_override()
-    flash("Automatic mode resumed.")
+    if _wants_json():
+        return {"ok": True, "device": device, "mode": mode, "message": message,
+                "climate_mode": state.get("climate_mode"),
+                "ac_status": state.get("ac_status"), "heater_status": state.get("heater_status"),
+                "state": _augment_diagnostics(state)}
+    flash(message)
     return redirect(url_for("dashboard"))
 
 @app.route("/control/test-email", methods=["POST"])
@@ -251,10 +287,11 @@ def control_test_email():
     confirming the Brevo integration is working after deployment.
     """
     sent = notification_manager.manual_test("This is a manual test alert from the dashboard control panel.")
-    if sent:
-        flash("Test email sent successfully - check your inbox.")
-    else:
-        flash("Test email failed to send - check BREVO_API_KEY and ALERT_EMAIL are set correctly.")
+    msg = ("Test email sent successfully - check your inbox." if sent
+           else "Test email failed to send - check BREVO_API_KEY and ALERT_EMAIL are set correctly.")
+    if _wants_json():
+        return {"ok": bool(sent), "message": msg}
+    flash(msg)
     return redirect(url_for("dashboard"))
 
 if __name__ == "__main__":

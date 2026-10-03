@@ -7,8 +7,10 @@ snapshot and pass its path to log_event(..., snapshot_path=...).
 
 import random
 import time
+import wake
 from security.alert_system import send_alert, send_clear_status
 from sensor_data import update_multiple
+from security.alarm import monitoring_paused
 from database import log_event
 
 cameras = ["Main Gate Camera", "Front Door Camera", "Backyard Camera"]
@@ -25,6 +27,8 @@ def identify_person():
 
 
 def scan_cameras():
+    if monitoring_paused():
+        return
     detections = []
 
     for camera in cameras:
@@ -66,11 +70,9 @@ def monitor_cameras(stop_event=None):
     print(" Camera Surveillance - CONTINUOUS WORKER")
     print("------------------------------------------")
     while stop_event is None or not stop_event.is_set():
+        _gen = wake.generation()
         try:
             scan_cameras()
         except Exception as e:
             print(f"  ⚠️ Camera worker error: {e}")
-        if stop_event:
-            stop_event.wait(scan_interval)
-        else:
-            time.sleep(scan_interval)
+        wake.nap(stop_event, scan_interval, _gen)
