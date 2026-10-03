@@ -20,9 +20,9 @@ def read_brightness():
 
 def control_lights(brightness):
     if brightness < min_brightness:
-        reason = f"It's dark ({brightness}% brightness, below the {min_brightness}% threshold) — lights ON"
+        reason = f"It's dark ({brightness}% brightness, below the {min_brightness}% threshold) - lights ON"
         return "ON", reason
-    reason = f"Bright enough ({brightness}% brightness, above the {min_brightness}% threshold) — lights OFF"
+    reason = f"Bright enough ({brightness}% brightness, above the {min_brightness}% threshold) - lights OFF"
     return "OFF", reason
 
 
@@ -39,7 +39,7 @@ def scan_energy():
     if not someone_home:
         update_multiple({
             "light_status": "OFF",
-            "light_reason": "No one is home — energy saving mode (lights off)",
+            "light_reason": "No one is home - energy saving mode (lights off)",
         })
         return
 

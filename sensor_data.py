@@ -144,16 +144,16 @@ def _normalize(state):
     reason = str(m.get("light_reason", ""))
     if not on:
         m["light_status"] = "OFF"
-        m["light_reason"] = "System is OFF — all automation paused"
+        m["light_reason"] = "System is OFF - all automation paused"
     elif light_mode == "ON":
         m["light_status"] = "ON"
-        m["light_reason"] = "Manual — homeowner turned lights ON"
+        m["light_reason"] = "Manual - homeowner turned lights ON"
     elif light_mode == "OFF":
         m["light_status"] = "OFF"
-        m["light_reason"] = "Manual — homeowner turned lights OFF"
+        m["light_reason"] = "Manual - homeowner turned lights OFF"
     elif not home:
         m["light_status"] = "OFF"
-        m["light_reason"] = "No one is home — energy saving mode (lights off)"
+        m["light_reason"] = "No one is home - energy saving mode (lights off)"
     elif reason.startswith(("Manual", "System is OFF", "No one is home")):
         # Back to automatic: take one fresh reading now instead of showing a
         # stale manual/placeholder reason until the energy worker's next scan.
@@ -165,7 +165,7 @@ def _normalize(state):
     if not on:
         m.update({
             "alarm_active": False, "alarm_layers": [], "siren_muted": False,
-            "last_detection": "System OFF — monitoring paused",
+            "last_detection": "System OFF - monitoring paused",
             "gate_status": "PAUSED", "door_status": "PAUSED", "gas_status": "PAUSED",
             "camera_status": "PAUSED", "camera_last_seen": "System OFF",
         })

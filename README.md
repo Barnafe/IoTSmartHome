@@ -1,4 +1,4 @@
-# Smart Home Automation & Security System — Persistent History Edition
+# Smart Home Automation & Security System - Persistent History Edition
 
 ## What was improved
 

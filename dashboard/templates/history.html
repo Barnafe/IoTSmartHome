@@ -99,7 +99,7 @@
         <td><span class="chip tone-{{ tone }}">{{ e.severity|capitalize }}</span></td>
         <td><span class="type"><i>{{ icons.get(e.event_type, '📋') }}</i>{{ e.event_type.replace('_',' ')|capitalize }}</span></td>
         <td class="msg"><a class="row" href="{{ url_for('history_detail', event_id=e.id) }}">{{ e.message }}</a></td>
-        <td class="hide-m">{{ e.location or '—' }}</td>
+        <td class="hide-m">{{ e.location or '-' }}</td>
       </tr>
       {% else %}<tr><td colspan="5" class="empty">No events match these filters. 🎉</td></tr>{% endfor %}
       </tbody></table></div>

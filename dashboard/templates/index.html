@@ -167,14 +167,14 @@
   </section>
 
   <section class="tiles">
-    <div class="tile sense" id="t-gate"><div class="th"><div class="ic">🚧</div><div class="nm">Gate</div><span class="badge" id="gate-badge"></span></div><div class="val" id="gate-value">—</div><div class="sub">Layer 1 · Gate sensor</div></div>
-    <div class="tile sense" id="t-door"><div class="th"><div class="ic">🚪</div><div class="nm">Door</div><span class="badge" id="door-badge"></span></div><div class="val" id="door-value">—</div><div class="sub">Layer 2 · Door sensors</div></div>
-    <div class="tile sense" id="t-occ"><div class="th"><div class="ic">🏠</div><div class="nm">Indoor / Room</div><span class="badge" id="occ-badge"></span></div><div class="val" id="occupancy-value">—</div><div class="sub">PIR motion detection</div></div>
-    <div class="tile sense" id="t-cam"><div class="th"><div class="ic">📷</div><div class="nm">Camera</div><span class="badge" id="cam-badge"></span></div><div class="val" id="camera-value">—</div><div class="sub" id="camera-status">—</div></div>
-    <div class="tile sense" id="t-temp"><div class="th"><div class="ic">🌡️</div><div class="nm">Temperature</div><span class="badge" id="temp-badge"></span></div><div class="val" id="temp-value">—</div><div class="sub" id="temp-status">—</div></div>
-    <div class="tile sense" id="t-gas"><div class="th"><div class="ic">🔥</div><div class="nm">Gas</div><span class="badge" id="gas-badge"></span></div><div class="val" id="gas-value">—</div><div class="sub" id="gas-status">—</div></div>
-    <div class="tile" id="t-light"><div class="th"><div class="ic">💡</div><div class="nm">Lights</div><span class="badge" id="light-badge"></span></div><div class="val" id="light-value">—</div><div class="sub" id="light-status">—</div></div>
-    <div class="tile" id="t-ac"><div class="th"><div class="ic">❄️</div><div class="nm">AC / Heater</div><span class="badge" id="ac-badge"></span></div><div class="val" id="ac-value">—</div><div class="sub" id="heater-value">—</div></div>
+    <div class="tile sense" id="t-gate"><div class="th"><div class="ic">🚧</div><div class="nm">Gate</div><span class="badge" id="gate-badge"></span></div><div class="val" id="gate-value">-</div><div class="sub">Layer 1 · Gate sensor</div></div>
+    <div class="tile sense" id="t-door"><div class="th"><div class="ic">🚪</div><div class="nm">Door</div><span class="badge" id="door-badge"></span></div><div class="val" id="door-value">-</div><div class="sub">Layer 2 · Door sensors</div></div>
+    <div class="tile sense" id="t-occ"><div class="th"><div class="ic">🏠</div><div class="nm">Indoor / Room</div><span class="badge" id="occ-badge"></span></div><div class="val" id="occupancy-value">-</div><div class="sub">PIR motion detection</div></div>
+    <div class="tile sense" id="t-cam"><div class="th"><div class="ic">📷</div><div class="nm">Camera</div><span class="badge" id="cam-badge"></span></div><div class="val" id="camera-value">-</div><div class="sub" id="camera-status">-</div></div>
+    <div class="tile sense" id="t-temp"><div class="th"><div class="ic">🌡️</div><div class="nm">Temperature</div><span class="badge" id="temp-badge"></span></div><div class="val" id="temp-value">-</div><div class="sub" id="temp-status">-</div></div>
+    <div class="tile sense" id="t-gas"><div class="th"><div class="ic">🔥</div><div class="nm">Gas</div><span class="badge" id="gas-badge"></span></div><div class="val" id="gas-value">-</div><div class="sub" id="gas-status">-</div></div>
+    <div class="tile" id="t-light"><div class="th"><div class="ic">💡</div><div class="nm">Lights</div><span class="badge" id="light-badge"></span></div><div class="val" id="light-value">-</div><div class="sub" id="light-status">-</div></div>
+    <div class="tile" id="t-ac"><div class="th"><div class="ic">❄️</div><div class="nm">AC / Heater</div><span class="badge" id="ac-badge"></span></div><div class="val" id="ac-value">-</div><div class="sub" id="heater-value">-</div></div>
   </section>
 
   <div class="main">
@@ -233,14 +233,14 @@
       <div class="panel">
         <h3>📈 System Overview</h3>
         <div class="ov">
-          <div>Worker Status <b id="ov-worker">—</b></div>
-          <div>Last Heartbeat <b id="ov-hb">—</b></div>
-          <div>Security Mode <b id="ov-sec">—</b></div>
-          <div>Alarm Active <b id="ov-alarm">—</b></div>
-          <div>Alarm Layers <b id="ov-layers">—</b></div>
-          <div>Someone Home <b id="ov-home">—</b></div>
-          <div>Last Updated <b id="ov-upd">—</b></div>
-          <div>Storage <b id="ov-db">—</b></div>
+          <div>Worker Status <b id="ov-worker">-</b></div>
+          <div>Last Heartbeat <b id="ov-hb">-</b></div>
+          <div>Security Mode <b id="ov-sec">-</b></div>
+          <div>Alarm Active <b id="ov-alarm">-</b></div>
+          <div>Alarm Layers <b id="ov-layers">-</b></div>
+          <div>Someone Home <b id="ov-home">-</b></div>
+          <div>Last Updated <b id="ov-upd">-</b></div>
+          <div>Storage <b id="ov-db">-</b></div>
         </div>
       </div>
     </div>
@@ -333,13 +333,13 @@
       else if (cm === "AUTO" && home) { if (w === "high") ac = "ON"; else if (w === "low") ht = "ON"; }
     }
     m.ac_status = ac; m.heater_status = ht;
-    if (!on) { m.light_status = "OFF"; m.light_reason = "System is OFF — all automation paused"; }
-    else if (m.light_mode === "ON") { m.light_status = "ON"; m.light_reason = "Manual — homeowner turned lights ON"; }
-    else if (m.light_mode === "OFF") { m.light_status = "OFF"; m.light_reason = "Manual — homeowner turned lights OFF"; }
-    else if (/^(Manual|System is OFF)/.test(m.light_reason || "")) { m.light_reason = "Automatic — updating…"; }
+    if (!on) { m.light_status = "OFF"; m.light_reason = "System is OFF - all automation paused"; }
+    else if (m.light_mode === "ON") { m.light_status = "ON"; m.light_reason = "Manual - homeowner turned lights ON"; }
+    else if (m.light_mode === "OFF") { m.light_status = "OFF"; m.light_reason = "Manual - homeowner turned lights OFF"; }
+    else if (/^(Manual|System is OFF)/.test(m.light_reason || "")) { m.light_reason = "Automatic - updating…"; }
     if (!on) {
       Object.assign(m, {alarm_active:false, alarm_layers:[], siren_muted:false, gate_status:"PAUSED", door_status:"PAUSED",
-        gas_status:"PAUSED", camera_status:"PAUSED", camera_last_seen:"System OFF", last_detection:"System OFF — monitoring paused"});
+        gas_status:"PAUSED", camera_status:"PAUSED", camera_last_seen:"System OFF", last_detection:"System OFF - monitoring paused"});
     } else {
       if (d.security_mode === "OFF" && m.security_mode !== "OFF") {
         Object.assign(m, {gate_status:"SECURE", door_status:"ALL CLOSED", gas_status:"SAFE", camera_status:"CLEAR", camera_last_seen:"No person detected"});

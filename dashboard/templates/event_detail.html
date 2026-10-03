@@ -50,7 +50,7 @@
     <div class="row"><b>Time</b><span><time id="when" datetime="{{ event.created_at }}">{{ event.created_at }}</time></span></div>
     <div class="row"><b>Message</b><span>{{ event.message }}</span></div>
     <div class="row"><b>Source</b><span>{{ event.source }}</span></div>
-    <div class="row"><b>Location</b><span>{{ event.location or "—" }}</span></div>
+    <div class="row"><b>Location</b><span>{{ event.location or "-" }}</span></div>
     <div class="row"><b>Snapshot</b><span>{{ event.snapshot_path or "No physical image attached to this simulation event." }}</span></div>
     <h3>Event details</h3>
     <pre>{{ event.metadata|pretty_json }}</pre>

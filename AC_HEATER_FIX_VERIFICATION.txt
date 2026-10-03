@@ -1,4 +1,4 @@
-SmartHome v2 — AC/Heater Card Focused Fix
+SmartHome v2 - AC/Heater Card Focused Fix
 =============================================
 
 BASELINE
