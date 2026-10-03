@@ -55,11 +55,12 @@ def _watch_security_mode(stop_event, poll_seconds=1.0):
     last = None
     while not stop_event.is_set():
         try:
-            on = system_is_on(read_data())
-            if last is not None and on != last:
-                print(f"  🔔 Security Mode changed -> {'ON' if on else 'OFF'}; waking all workers")
+            state = read_data()
+            key = (system_is_on(state), state.get("security_epoch", 0))
+            if last is not None and key != last:
+                print(f"  🔔 Security Mode changed -> {'ON' if key[0] else 'OFF'}; waking all workers")
                 wake.wake_all()
-            last = on
+            last = key
         except Exception as exc:
             print(f"  ⚠️ Security-mode watcher error: {exc}")
         stop_event.wait(poll_seconds)

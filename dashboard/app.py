@@ -15,8 +15,9 @@
 import os
 import sys
 import threading
+import time
 from datetime import datetime
-from flask import Flask, render_template, redirect, url_for, flash, request, Response
+from flask import Flask, render_template, redirect, url_for, flash, request, Response, stream_with_context
 
 # make sure the SmartHome project root (one level up from this
 # dashboard/ folder) is on the import path. This is needed because
@@ -35,6 +36,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from sensor_data import read_data, set_mode, CONTROL_MODES
+from live import Broadcaster
 from database import log_event, init_db, get_events, get_event, get_stats, clear_history, get_backend
 from security.alarm import mute_siren
 from notify import notification_manager
@@ -159,6 +161,47 @@ def dashboard():
     return render_template("index.html", data=data)
 
 
+def _live_state():
+    """Full state for push: shared state + diagnostics + newest event id."""
+    data = _augment_diagnostics(read_data())
+    try:
+        latest = get_events(1)
+        data["_event_id"] = latest[0]["id"] if latest else 0
+    except Exception:
+        data["_event_id"] = 0
+    return data
+
+
+live = Broadcaster(_live_state)
+
+
+@app.route("/api/stream")
+def api_stream():
+    """Server-Sent Events: every connected device gets each new state at once."""
+    live.ensure_started()
+
+    def generate():
+        seen = 0
+        yield "retry: 1000\n\n"
+        while True:
+            version, payload = live.wait(seen, 15)
+            if version != seen and payload:
+                seen = version
+                yield f"data: {payload}\n\n"
+            else:
+                yield ": ping\n\n"          # keep proxies from closing an idle stream
+
+    return Response(stream_with_context(generate()), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache, no-transform",
+                             "X-Accel-Buffering": "no", "Connection": "keep-alive"})
+
+
+@app.route("/api/time")
+def api_time():
+    """Server clock in ms, so every device can align its siren to the same beat."""
+    return {"t": int(time.time() * 1000)}, 200, {"Cache-Control": "no-store"}
+
+
 @app.route("/api/state")
 def api_state():
     """Return the authoritative shared live state for real-time dashboard updates."""
@@ -221,6 +264,7 @@ def _wants_json():
 @app.route("/control/silence", methods=["POST"])
 def control_silence():
     muted = mute_siren()
+    live.kick()
     msg = ("Siren silenced. The breach is still being monitored." if muted
            else "Nothing to silence - no active breach right now.")
     if _wants_json():
@@ -253,18 +297,19 @@ def control_device(device):
     Called with fetch() by the dashboard (JSON reply, no page reload) and still
     degrades to a normal form post + redirect."""
     mode = (request.form.get("mode") or "").strip().upper()
+    mode = {"CLOSE": "CLOSED", "RESUME": "AUTO", "NORMAL": "AUTO"}.get(mode, mode)
     if device not in CONTROL_MODES:
         return {"ok": False, "error": "Unknown control"}, 404
+    message = _CONTROL_LABELS.get(device, {}).get(mode)
     try:
-        state = set_mode(device, mode)
+        state = set_mode(device, mode, note=message)
     except ValueError:
         if _wants_json():
             return {"ok": False, "error": "Invalid mode"}, 400
         flash("Invalid control option.")
         return redirect(url_for("dashboard"))
+    live.kick()      # push to every connected device right now
 
-    mode = "CLOSED" if mode == "CLOSE" else ("AUTO" if mode in ("RESUME", "NORMAL") else mode)
-    message = _CONTROL_LABELS[device][mode]
     try:
         log_event("homeowner_control", "warning" if (device == "security" and mode == "OFF") else "info",
                   "homeowner", "Entire House", message, metadata={"control": device, "mode": mode})

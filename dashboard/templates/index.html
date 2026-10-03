@@ -26,6 +26,7 @@
   .t-warn{color:var(--amber);border-color:rgba(253,180,1,.55);background:rgba(253,180,1,.08)}
   .t-info{color:var(--cyan);border-color:rgba(15,219,250,.5);background:rgba(15,219,250,.08)}
   .t-off{color:#8aa3b8;border-color:rgba(138,163,184,.4);background:rgba(138,163,184,.07)}
+  .soundbtn{background:rgba(253,180,1,.1);color:var(--amber);border:1px solid rgba(253,180,1,.55);border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
   .admin{display:flex;align-items:center;gap:10px}
   .avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#0aa7e6,#0a6fd0);display:grid;place-items:center;font-weight:700}
   .admin div{line-height:1.2;font-size:13px}.admin small{color:var(--muted)}
@@ -147,6 +148,7 @@
   </nav>
   <div class="tright">
     <div class="clock"><b id="clock-time">--:--:--</b><span id="clock-date"></span></div>
+    <button type="button" id="sound-btn" class="soundbtn">🔊 Tap to enable alarm sound</button>
     <span class="pill-st t-good" id="sys-pill">System Online</span>
     <div class="admin"><div class="avatar">A</div><div>Admin<br><small>Administrator</small></div></div>
   </div>
@@ -256,13 +258,19 @@
   const $ = id => document.getElementById(id);
   const URLS = {
     state: "{{ url_for('api_state') }}",
+    stream: "{{ url_for('api_stream') }}",
+    time: "{{ url_for('api_time') }}",
     history: "{{ url_for('api_history') }}",
     detail: "{{ url_for('history') }}/",
     control: d => "{{ url_for('control_device', device='__D__') }}".replace("__D__", d)
   };
   let last = {{ data | tojson }};
-  let epoch = 0;          // bumps on every control press; stale polls are discarded
-  let inflight = 0;
+  let inflight = 0;       // controls pressed on THIS device and not yet confirmed
+  let lastV = last._v || 0;       // newest state version applied (older copies are ignored)
+  let deferred = null;            // newer state that arrived while a press was in flight
+  let seenAction = (last.last_action || {}).id || 0;
+  let lastEventId = null;
+  let clockOffset = 0;            // server time minus this device's time, in ms
 
   const TONES = ["t-good","t-bad","t-warn","t-info","t-off"];
   function tone(el, t, text) {
@@ -291,7 +299,7 @@
   // ---- siren (front-end audio only; reads alarm_active / siren_muted) ----
   // Browsers only allow sound after a user gesture; the unlock listeners keep
   // trying on every tap/click/key until one succeeds.
-  let audioCtx = null, sirenTimer = null, audioUnlocked = false;
+  let audioCtx = null, audioUnlocked = false;
   function ctxGet() {
     if (!audioCtx) { const C = window.AudioContext || window.webkitAudioContext; if (C) audioCtx = new C(); }
     return audioCtx;
@@ -304,21 +312,55 @@
       const o = ctx.createOscillator(), g = ctx.createGain();
       g.gain.value = 0.0001; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.05);
     } catch (e) {}
-    if (ctx.state !== "suspended") { audioUnlocked = true; if (sirenTimer) pim(); }
+    if (ctx.state !== "suspended") { audioUnlocked = true; $("sound-btn").style.display = "none"; }
   }
   ["click","touchstart","pointerdown","keydown"].forEach(e => document.addEventListener(e, unlockAudio));
+  $("sound-btn").addEventListener("click", unlockAudio);
   function beep(off, f) {
-    const ctx = ctxGet(); if (!ctx) return;
-    const o = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime + off;
+    const ctx = ctxGet(); if (!ctx || ctx.state === "suspended") return;
+    const o = ctx.createOscillator(), g = ctx.createGain(), t0 = ctx.currentTime + Math.max(0, off);
     o.type = "square"; o.frequency.value = f;
     g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.15, t0 + 0.01); g.gain.linearRampToValueAtTime(0, t0 + 0.12);
     o.connect(g); g.connect(ctx.destination); o.start(t0); o.stop(t0 + 0.14);
   }
-  function pim() { const c = ctxGet(); if (!c || c.state === "suspended") return; beep(0, 1000); beep(0.18, 1000); }
-  function siren(on) {
-    if (on && !sirenTimer) { pim(); sirenTimer = setInterval(pim, 1000); }
-    else if (!on && sirenTimer) { clearInterval(sirenTimer); sirenTimer = null; }
+
+  // The "pim-pim" follows the SERVER clock, not the moment a device opened the
+  // page: it sounds at every whole second of server time, so any number of
+  // devices, joined at any time, beep together. The beep is scheduled slightly
+  // ahead on the audio clock so it lands exactly on the shared second.
+  let sirenOn = false, sirenTimer = null, lastBoundary = 0;
+  const serverNow = () => Date.now() + clockOffset;
+  function tickSiren() {
+    sirenTimer = null;
+    if (!sirenOn) return;
+    const now = serverNow();
+    const boundary = Math.max((Math.floor(now / 1000) + 1) * 1000, lastBoundary + 1000);
+    let wait = boundary - now - 120;                 // wake just before the boundary
+    if (wait < 0) { lastBoundary = boundary; return tickSiren(); }   // too close: use the next second
+    sirenTimer = setTimeout(() => {
+      const ahead = (boundary - serverNow()) / 1000;
+      beep(ahead, 1000); beep(ahead + 0.18, 1000);
+      lastBoundary = boundary; tickSiren();
+    }, wait);
   }
+  function siren(on) {
+    if (on && !sirenOn) { sirenOn = true; tickSiren(); }
+    else if (!on && sirenOn) { sirenOn = false; if (sirenTimer) { clearTimeout(sirenTimer); sirenTimer = null; } }
+  }
+  async function syncClock() {
+    let best = null;
+    for (let i = 0; i < 5; i++) {
+      const t0 = Date.now();
+      try {
+        const r = await fetch(URLS.time, {cache: "no-store"});
+        const j = await r.json(), t1 = Date.now(), rtt = t1 - t0;
+        if (!best || rtt < best.rtt) best = {rtt, off: j.t + rtt / 2 - t1};
+      } catch (e) {}
+      await new Promise(r => setTimeout(r, 120));
+    }
+    if (best) clockOffset = best.off;
+  }
+  syncClock(); setInterval(syncClock, 60000);
 
   // ---- derived values for instant (optimistic) feedback ----
   // Mirrors the server's rules so a press shows its result before the reply
@@ -366,6 +408,13 @@
   function render(d) {
     d = Object.assign({light_mode:"AUTO", gate_mode:"AUTO", door_mode:"AUTO", security_mode:"AUTO", climate_mode:"AUTO"}, d);
     last = d;
+    if (d.last_action && d.last_action.id && d.last_action.id !== seenAction) {
+      seenAction = d.last_action.id; toast(d.last_action.text);     // same message on every device
+    }
+    if (d._event_id !== undefined && d._event_id !== lastEventId) {
+      if (lastEventId !== null) loadEvents();
+      lastEventId = d._event_id;
+    }
     const on = d.security_mode !== "OFF";
     const alarm = !!d.alarm_active;
     const wOnline = String(d.worker_status || "").startsWith("ONLINE");
@@ -486,15 +535,29 @@
     } catch (e) {} finally { loadingEvents = false; }
   }
 
-  // ---- polling ----
-  async function poll() {
-    if (inflight) return;
-    const my = epoch;
+  // ---- live state: pushed by the server to every device ----
+  // applyState keeps only the NEWEST version, so devices pressing at the same
+  // time can never leave one screen on an older state than another.
+  function applyState(d) {
+    const v = d._v || 0;
+    if (v < lastV) return;                           // stale copy: ignore
+    if (inflight) { if (!deferred || v >= (deferred._v || 0)) deferred = d; return; }
+    lastV = v; render(d);
+  }
+  function settle() {
+    if (inflight || !deferred) return;
+    const d = deferred; deferred = null; applyState(d);
+  }
+  let source = null;
+  function connect() {
+    if (!window.EventSource) return;
+    source = new EventSource(URLS.stream);
+    source.onmessage = ev => { try { applyState(JSON.parse(ev.data)); } catch (e) {} };
+  }
+  async function poll() {                            // safety net if the stream is blocked
     try {
       const r = await fetch(URLS.state, {cache: "no-store"});
-      if (!r.ok) return;
-      const d = await r.json();
-      if (my === epoch && !inflight) render(d);   // never let a stale poll overwrite a fresh press
+      if (r.ok) applyState(await r.json());
     } catch (e) {}
   }
 
@@ -503,13 +566,14 @@
     row.querySelectorAll("button").forEach(btn => {
       btn.addEventListener("click", async () => {
         const dev = row.dataset.device, mode = btn.dataset.mode;
-        epoch++; inflight++;
+        inflight++;
         const before = last;
-        // 1) show the result immediately
+        // 1) show the result immediately on this device
         const pending = Object.assign({}, last); pending[dev + "_mode"] = mode;
         render(derive(pending));
-        // 2) confirm with the server and adopt its authoritative state
+        // 2) confirm with the server; it pushes the same result to every device
         const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 8000);
+        let failed = null;
         try {
           const r = await fetch(URLS.control(dev), {
             method: "POST", credentials: "same-origin", signal: ctl.signal,
@@ -517,11 +581,14 @@
             body: "mode=" + encodeURIComponent(mode)
           });
           const j = await r.json();
-          if (j.ok) { render(j.state); toast(j.message); loadEvents(); }
-          else { render(before); toast("That option could not be applied."); }
-        } catch (e) {
-          render(before); toast("No connection - the change was not applied.");
-        } finally { clearTimeout(to); inflight--; epoch++; }
+          if (j.ok) { if ((j.state._v || 0) >= lastV) { lastV = j.state._v || lastV; render(j.state); } }
+          else failed = "That option could not be applied.";
+        } catch (e) { failed = "No connection - the change was not applied."; }
+        finally {
+          clearTimeout(to); inflight--;
+          if (failed) { render(before); toast(failed); }
+          settle();
+        }
       });
     });
   });
@@ -534,18 +601,18 @@
       const r = await fetch(btn.dataset.url, {method: "POST", credentials: "same-origin", signal: ctl.signal, headers: {"X-Requested-With": "fetch"}});
       const j = await r.json();
       toast(j.message || (j.ok ? "Done." : "Failed."));
-      if (j.state) render(j.state);
+      if (j.state) applyState(j.state);
     } catch (e) { toast("No connection - please try again."); }
     finally { clearTimeout(to); btn.disabled = false; btn.textContent = old; }
   }
-  $("silence-btn").addEventListener("click", e => { epoch++; utility(e.currentTarget, "🔇 Silencing…").then(() => epoch++); });
+  $("silence-btn").addEventListener("click", e => utility(e.currentTarget, "🔇 Silencing…"));
   $("email-btn").addEventListener("click", e => utility(e.currentTarget, "📧 Sending…"));
 
   render(last);
   loadEvents();
-  poll();
-  setInterval(poll, 2000);
-  setInterval(loadEvents, 5000);
+  connect();
+  setInterval(poll, 5000);
+  setInterval(loadEvents, 15000);
 })();
 </script>
 </body>

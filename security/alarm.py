@@ -193,6 +193,19 @@ def get_active_layers():
         return [name for name, breached in layer_status.items() if breached]
 
 
+_seen_epoch = None
+
+
+def _forget_local_alarm():
+    """Drop this process's in-memory alarm memory (does not publish anything)."""
+    global alarm_active, siren_muted
+    with _alarm_lock:
+        alarm_active = False
+        siren_muted = False
+        layer_status.clear()
+        detection_locations.clear()
+
+
 def monitoring_paused():
     """True while the homeowner has Security Mode OFF.
 
@@ -200,9 +213,20 @@ def monitoring_paused():
     when it returns True. The first time it sees the system OFF it also clears
     this process's own alarm memory, so nothing stale re-appears on resume.
     """
+    global _seen_epoch
     try:
         from sensor_data import read_data, system_is_on
-        if system_is_on(read_data()):
+        state = read_data()
+        epoch = state.get("security_epoch", 0)
+        if _seen_epoch is None:
+            _seen_epoch = epoch
+        elif epoch != _seen_epoch:
+            # Security Mode was pressed since this worker last looked (even a
+            # quick OFF then ON): forget any pre-press alarm so it can never
+            # reappear on the freshly cleaned board.
+            _seen_epoch = epoch
+            _forget_local_alarm()
+        if system_is_on(state):
             return False
     except Exception:
         return False

@@ -207,6 +207,9 @@ def _commit(mutate):
             merged = dict(current) if isinstance(current, dict) else {}
             mutate(merged)
             merged = _normalize(merged)
+            # Strictly increasing version: lets every browser discard an
+            # out-of-order/stale copy and always end on the newest state.
+            merged["_v"] = max(int(time.time() * 1000), int(current.get("_v", 0) if isinstance(current, dict) else 0) + 1)
             merged["last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
             return merged
         try:
@@ -279,7 +282,7 @@ def reset_data():
         _save()
 
 
-def set_mode(device, mode):
+def set_mode(device, mode, note=None):
     """Homeowner control: set one device to one of its modes (or AUTO).
 
     Returns the new full state. Raises ValueError for an unknown device/mode."""
@@ -294,6 +297,13 @@ def set_mode(device, mode):
     def _mutate(m):
         was_off = not system_is_on(m)
         m[key] = mode
+        if note:
+            # shown as a toast on EVERY connected device
+            m["last_action"] = {"id": int(time.time() * 1000), "text": note}
+        if device == "security":
+            # every Security Mode press bumps this so each worker notices,
+            # even if OFF and ON happen faster than a worker could look
+            m["security_epoch"] = int(m.get("security_epoch", 0)) + 1
         if device == "security" and was_off and mode != "OFF":
             # Coming back on: show a clean normal board until each sensor's
             # next scan reports its real reading.

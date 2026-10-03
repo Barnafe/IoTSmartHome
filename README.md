@@ -281,3 +281,9 @@ never activates the global alarm or automated incident notification manager.
 ### v14
 - Workers wake instantly when Security Mode changes (`wake.py`, mode watcher in `engine.py`): after ON every sensor takes a fresh reading within about a second; after OFF they stand down at once.
 - History page and event detail redesigned in the dashboard theme (filters as chips, stat cards, confirm before clearing). The dashboard's Recent Activity and Incident History show the latest 3 items, each clickable, with a View All button.
+
+### v16 - every device in sync
+- Live push: `/api/stream` (Server-Sent Events, `live.py`) sends each new system state to every open device at once. A press on one device appears on all others in about 0.2 s, with the same toast message.
+- Every state change carries a strictly increasing `_v`; a device only ever applies a newer state, so simultaneous presses from several devices cannot leave screens disagreeing. The last press wins everywhere.
+- The siren "pim-pim" follows the server clock (`/api/time`), so all devices beep on the same second no matter when they joined. Browsers need one tap per device before they allow sound (a "Tap to enable alarm sound" button is shown until then).
+- Procfile now runs gunicorn with `--worker-class gthread --threads 64` so many devices can stay connected.
