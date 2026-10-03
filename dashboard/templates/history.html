@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>History - Smart Home System</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+<link rel="stylesheet" href="{{ static_v('css/theme.css') }}">
 <style>
   body{background:radial-gradient(1100px 520px at 90% -10%,rgba(8,70,150,.30),transparent 60%),var(--bg);min-height:100vh}
   .wrap{max-width:1300px;margin:0 auto;padding:24px 22px 50px}
@@ -50,7 +50,7 @@
     th,td{padding:10px 8px;font-size:13px}.head h1{font-size:23px}.frow label{min-width:100%}}
 </style></head><body>
 <header class="topbar"><div class="in">
-  <a class="logo" href="{{ url_for('home') }}"><img class="brand-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="Barnafé Tech Services"></a>
+  <a class="logo" href="{{ url_for('home') }}"><img class="brand-logo" src="{{ static_v('img/logo.png') }}" alt="Barnafé Tech Services"></a>
   <nav class="tnav">
     <a href="{{ url_for('home') }}">🏠 Home</a>
     <a href="{{ url_for('dashboard') }}">📊 Dashboard</a>

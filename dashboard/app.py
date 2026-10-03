@@ -37,7 +37,7 @@ load_dotenv()
 
 from sensor_data import read_data, set_mode, CONTROL_MODES
 from live import Broadcaster
-from database import log_event, init_db, get_events, get_event, get_stats, clear_history, get_backend
+from database import log_event, init_db, get_latest_event_id, get_events, get_event, get_stats, clear_history, get_backend
 from security.alarm import mute_siren
 from notify import notification_manager
 
@@ -45,6 +45,53 @@ init_db()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key-change-in-production")
+
+# Static files (logo, house photo, css) are cached by the browser, so pages
+# after the first visit load almost instantly. static_v() adds the file's
+# modified time to the URL, so a changed image is still picked up immediately.
+from datetime import timedelta
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = timedelta(days=30)
+
+
+@app.context_processor
+def _static_helpers():
+    def static_v(filename):
+        try:
+            v = int(os.path.getmtime(os.path.join(app.static_folder, filename)))
+        except OSError:
+            v = 0
+        return url_for("static", filename=filename, v=v)
+    return {"static_v": static_v}
+
+
+_COMPRESSIBLE = ("text/html", "text/css", "application/json", "text/javascript", "image/svg+xml")
+
+
+@app.after_request
+def _compress(resp):
+    """gzip text responses (HTML/JSON/CSS): 3 to 6 times fewer bytes on slow mobile data."""
+    try:
+        if (resp.status_code != 200 or resp.direct_passthrough or "Content-Encoding" in resp.headers
+                or "gzip" not in request.headers.get("Accept-Encoding", "")
+                or resp.mimetype not in _COMPRESSIBLE):
+            return resp
+        data = resp.get_data()
+        if len(data) < 600:
+            return resp
+        import gzip
+        resp.set_data(gzip.compress(data, compresslevel=5))
+        resp.headers["Content-Encoding"] = "gzip"
+        resp.headers["Vary"] = "Accept-Encoding"
+        resp.headers["Content-Length"] = str(len(resp.get_data()))
+    except Exception:
+        pass
+    return resp
+
+
+@app.route("/healthz")
+def healthz():
+    """Instant 'I am awake' check (no database). Point an uptime pinger at this."""
+    return "ok", 200, {"Cache-Control": "no-store"}
 
 # ---- embedded worker (free-tier single-service mode) ----
 #
@@ -165,14 +212,13 @@ def _live_state():
     """Full state for push: shared state + diagnostics + newest event id."""
     data = _augment_diagnostics(read_data())
     try:
-        latest = get_events(1)
-        data["_event_id"] = latest[0]["id"] if latest else 0
+        data["_event_id"] = get_latest_event_id()
     except Exception:
         data["_event_id"] = 0
     return data
 
 
-live = Broadcaster(_live_state)
+live = Broadcaster(_live_state, interval=0.4)
 
 
 @app.route("/api/stream")

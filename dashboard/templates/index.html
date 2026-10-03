@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Smart Home Dashboard</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+<link rel="stylesheet" href="{{ static_v('css/theme.css') }}">
 <style>
   body{padding:0;background:radial-gradient(1100px 520px at 90% -10%,rgba(8,70,150,.30),transparent 60%),var(--bg);min-height:100vh}
   .wrap{max-width:1440px;margin:0 auto;padding:0 22px 40px}
@@ -70,7 +70,7 @@
   .panel h3 .r{margin-left:auto;text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600}
   .panel h3 a{color:var(--cyan);text-decoration:none}
 
-  .cam{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:16/10;background:#000 url('{{ url_for("static", filename="img/hero.jpg") }}') center/cover}
+  .cam{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:16/10;background:#000 url('{{ static_v("img/hero.jpg") }}') center/cover}
   .cam .live{position:absolute;top:10px;right:10px;background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:5px;letter-spacing:1px}
   .cam .cap{position:absolute;left:0;right:0;bottom:0;padding:22px 12px 9px;background:linear-gradient(0deg,rgba(0,8,20,.9),transparent);font-size:12.5px;color:#fff}
   .cam.paused-cam{filter:grayscale(1) brightness(.4)}
@@ -148,6 +148,7 @@
   </nav>
   <div class="tright">
     <div class="clock"><b id="clock-time">--:--:--</b><span id="clock-date"></span></div>
+    <span class="pill-st t-warn" id="link-pill">● Connecting…</span>
     <button type="button" id="sound-btn" class="soundbtn">🔊 Tap to enable alarm sound</button>
     <span class="pill-st t-good" id="sys-pill">System Online</span>
     <div class="admin"><div class="avatar">A</div><div>Admin<br><small>Administrator</small></div></div>
@@ -266,6 +267,7 @@
   };
   let last = {{ data | tojson }};
   let inflight = 0;       // controls pressed on THIS device and not yet confirmed
+  let confirmed = last;           // newest state the server has confirmed
   let lastV = last._v || 0;       // newest state version applied (older copies are ignored)
   let deferred = null;            // newer state that arrived while a press was in flight
   let seenAction = (last.last_action || {}).id || 0;
@@ -288,9 +290,11 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 2600);
   }
 
+  const serverNow = () => Date.now() + clockOffset;
+
   // ---- clock ----
   function tick() {
-    const n = new Date();
+    const n = new Date(serverNow());          // one shared clock on every device
     $("clock-time").textContent = n.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
     $("clock-date").textContent = n.toLocaleDateString([], {weekday:"short", day:"2-digit", month:"short", year:"numeric"});
   }
@@ -329,7 +333,6 @@
   // devices, joined at any time, beep together. The beep is scheduled slightly
   // ahead on the audio clock so it lands exactly on the shared second.
   let sirenOn = false, sirenTimer = null, lastBoundary = 0;
-  const serverNow = () => Date.now() + clockOffset;
   function tickSiren() {
     sirenTimer = null;
     if (!sirenOn) return;
@@ -349,18 +352,18 @@
   }
   async function syncClock() {
     let best = null;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 4; i++) {
       const t0 = Date.now();
       try {
         const r = await fetch(URLS.time, {cache: "no-store"});
         const j = await r.json(), t1 = Date.now(), rtt = t1 - t0;
         if (!best || rtt < best.rtt) best = {rtt, off: j.t + rtt / 2 - t1};
       } catch (e) {}
-      await new Promise(r => setTimeout(r, 120));
+      await new Promise(r => setTimeout(r, 80));
     }
     if (best) clockOffset = best.off;
   }
-  syncClock(); setInterval(syncClock, 60000);
+  syncClock(); setInterval(syncClock, 30000);
 
   // ---- derived values for instant (optimistic) feedback ----
   // Mirrors the server's rules so a press shows its result before the reply
@@ -409,7 +412,8 @@
     d = Object.assign({light_mode:"AUTO", gate_mode:"AUTO", door_mode:"AUTO", security_mode:"AUTO", climate_mode:"AUTO"}, d);
     last = d;
     if (d.last_action && d.last_action.id && d.last_action.id !== seenAction) {
-      seenAction = d.last_action.id; toast(d.last_action.text);     // same message on every device
+      seenAction = d.last_action.id;                                   // same message on every device
+      toast(d.last_action.text + "  (" + new Date(d.last_action.id).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"}) + ")");
     }
     if (d._event_id !== undefined && d._event_id !== lastEventId) {
       if (lastEventId !== null) loadEvents();
@@ -542,18 +546,40 @@
     const v = d._v || 0;
     if (v < lastV) return;                           // stale copy: ignore
     if (inflight) { if (!deferred || v >= (deferred._v || 0)) deferred = d; return; }
-    lastV = v; render(d);
+    lastV = v; confirmed = d; render(d);
   }
   function settle() {
     if (inflight || !deferred) return;
     const d = deferred; deferred = null; applyState(d);
   }
-  let source = null;
+  let source = null, lastPush = 0, reconnectTimer = null;
+  function linkPill(ok) {
+    const e = $("link-pill"); if (!e) return;
+    e.textContent = ok ? "● Live" : "● Reconnecting…";
+    e.className = "pill-st " + (ok ? "t-good" : "t-warn");
+  }
   function connect() {
     if (!window.EventSource) return;
+    if (source) { try { source.close(); } catch (e) {} }
     source = new EventSource(URLS.stream);
-    source.onmessage = ev => { try { applyState(JSON.parse(ev.data)); } catch (e) {} };
+    source.onopen = () => linkPill(true);
+    source.onmessage = ev => { lastPush = Date.now(); linkPill(true); try { applyState(JSON.parse(ev.data)); } catch (e) {} };
+    source.onerror = () => {
+      linkPill(false);
+      if (source.readyState === 2 && !reconnectTimer) {          // browser gave up: retry ourselves
+        reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, 2000);
+      }
+    };
   }
+  // A phone that slept or a tab that was in the background catches up the
+  // instant it is looked at again: re-sync the clock, fetch the latest state,
+  // and reopen the live connection if it dropped.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    syncClock(); poll();
+    if (!source || source.readyState === 2) connect();
+  });
+  window.addEventListener("online", () => { poll(); connect(); });
   async function poll() {                            // safety net if the stream is blocked
     try {
       const r = await fetch(URLS.state, {cache: "no-store"});
@@ -562,33 +588,55 @@
   }
 
   // ---- homeowner controls: instant, no page reload ----
+  // Each press shows its result at once. The requests are then sent one after
+  // another (so quick presses stay in order) and retried automatically if the
+  // network or the server is slow, so a weak connection does not turn into a
+  // "not applied" message. Repeating a press is harmless: it sets, not toggles.
+  let sendChain = Promise.resolve();
+  async function sendControl(dev, mode) {
+    const waits = [0, 600, 1500];
+    let lastErr = "";
+    for (let i = 0; i < waits.length; i++) {
+      if (waits[i]) await new Promise(r => setTimeout(r, waits[i]));
+      const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), i === 0 ? 10000 : 15000);
+      try {
+        const r = await fetch(URLS.control(dev), {
+          method: "POST", credentials: "same-origin", signal: ctl.signal,
+          headers: {"X-Requested-With": "fetch", "Content-Type": "application/x-www-form-urlencoded"},
+          body: "mode=" + encodeURIComponent(mode)
+        });
+        if (r.status === 400 || r.status === 404) return {ok: false, rejected: true};
+        const j = await r.json();
+        if (j && j.ok) return j;
+        lastErr = "server";
+      } catch (e) { lastErr = (e && e.name === "AbortError") ? "slow" : "offline"; }
+      finally { clearTimeout(to); }
+    }
+    return {ok: false, why: lastErr};
+  }
+
   document.querySelectorAll(".ctl").forEach(row => {
     row.querySelectorAll("button").forEach(btn => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", () => {
         const dev = row.dataset.device, mode = btn.dataset.mode;
         inflight++;
-        const before = last;
         // 1) show the result immediately on this device
         const pending = Object.assign({}, last); pending[dev + "_mode"] = mode;
         render(derive(pending));
         // 2) confirm with the server; it pushes the same result to every device
-        const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 8000);
-        let failed = null;
-        try {
-          const r = await fetch(URLS.control(dev), {
-            method: "POST", credentials: "same-origin", signal: ctl.signal,
-            headers: {"X-Requested-With": "fetch", "Content-Type": "application/x-www-form-urlencoded"},
-            body: "mode=" + encodeURIComponent(mode)
-          });
-          const j = await r.json();
-          if (j.ok) { if ((j.state._v || 0) >= lastV) { lastV = j.state._v || lastV; render(j.state); } }
-          else failed = "That option could not be applied.";
-        } catch (e) { failed = "No connection - the change was not applied."; }
-        finally {
-          clearTimeout(to); inflight--;
-          if (failed) { render(before); toast(failed); }
+        sendChain = sendChain.then(async () => {
+          const j = await sendControl(dev, mode);
+          inflight--;
+          if (j.ok) {
+            if ((j.state._v || 0) >= lastV) { lastV = j.state._v || lastV; confirmed = j.state; render(j.state); }
+          } else {
+            render(confirmed);
+            toast(j.rejected ? "That option could not be applied."
+                : j.why === "offline" ? "You appear to be offline - the change was not applied."
+                : "The server is taking too long - the change was not applied. Please try again.");
+          }
           settle();
-        }
+        });
       });
     });
   });
@@ -596,7 +644,7 @@
   // ---- utility buttons ----
   async function utility(btn, busyText) {
     const old = btn.textContent; btn.disabled = true; btn.textContent = busyText;
-    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 12000);
+    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 20000);
     try {
       const r = await fetch(btn.dataset.url, {method: "POST", credentials: "same-origin", signal: ctl.signal, headers: {"X-Requested-With": "fetch"}});
       const j = await r.json();

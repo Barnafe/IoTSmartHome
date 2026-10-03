@@ -13,6 +13,8 @@ from pathlib import Path
 import json
 import os
 import sqlite3
+import threading
+import time
 
 try:
     from dotenv import load_dotenv
@@ -40,20 +42,83 @@ def _use_postgres():
     return _database_url() is not None
 
 
+class _PooledPg:
+    """A reusable PostgreSQL connection that behaves like the old one-shot
+    ``with _connect() as conn`` object, but is NOT closed on exit.
+
+    Opening a brand-new TLS connection to a remote database (Neon) costs
+    hundreds of milliseconds, and the app used to do it for every single
+    read. A small pool removes that cost from every page load and button press.
+    """
+    _idle = []                                   # connections ready for reuse
+    _lock = threading.Lock()
+    _slots = threading.BoundedSemaphore(8)       # never hold more than 8 connections
+
+    def __init__(self):
+        _PooledPg._slots.acquire()
+        self._conn = None
+        try:
+            with _PooledPg._lock:
+                self._conn = _PooledPg._idle.pop() if _PooledPg._idle else None
+            if self._conn is not None:
+                try:
+                    if self._conn.closed or self._conn.broken:
+                        raise RuntimeError("stale")
+                    if time.monotonic() - getattr(self._conn, "_last_used", 0) > 20:
+                        self._conn.execute("SELECT 1")      # cheap liveness check after idle
+                        self._conn.rollback()
+                except Exception:
+                    self._discard()
+            if self._conn is None:
+                import psycopg
+                from psycopg.rows import dict_row
+                # Neon accepts the SSL parameters contained in its connection string.
+                self._conn = psycopg.connect(_database_url(), row_factory=dict_row,
+                                             connect_timeout=10)
+        except Exception:
+            _PooledPg._slots.release()
+            raise
+
+    def _discard(self):
+        try:
+            self._conn.close()
+        except Exception:
+            pass
+        self._conn = None
+
+    def __getattr__(self, name):
+        return getattr(self._conn, name)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        try:
+            if exc_type is None:
+                self._conn.commit()
+            else:
+                self._conn.rollback()
+            self._conn._last_used = time.monotonic()
+            with _PooledPg._lock:
+                _PooledPg._idle.append(self._conn)
+        except Exception:
+            self._discard()
+        finally:
+            _PooledPg._slots.release()
+        return False
+
+
 def _connect():
     """Open a connection to the configured database backend."""
     if _use_postgres():
         try:
-            import psycopg
-            from psycopg.rows import dict_row
+            import psycopg  # noqa: F401
         except ImportError as exc:
             raise RuntimeError(
                 "DATABASE_URL is configured, but the PostgreSQL driver is not "
                 "installed. Install the dependencies from requirements.txt."
             ) from exc
-
-        # Neon accepts the SSL parameters contained in its connection string.
-        return psycopg.connect(_database_url(), row_factory=dict_row)
+        return _PooledPg()
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, timeout=10)
@@ -140,11 +205,38 @@ def _execute_schema(conn):
         conn.execute(statement)
 
 
+_schema_ready = set()
+_schema_lock = threading.Lock()
+
+
 def init_db():
-    """Create the database schema if it does not already exist."""
+    """Create the database schema if it does not already exist.
+
+    Runs the schema statements once per database per process. It used to run
+    on EVERY query (a connection plus about ten CREATE statements each time),
+    which made every page load and button press slow on a remote database.
+    """
+    key = (_database_url() or str(DB_PATH))
+    if key in _schema_ready and (_database_url() or DB_PATH.exists()):
+        return
+    with _schema_lock:
+        if key in _schema_ready and (_database_url() or DB_PATH.exists()):
+            return
+        with _connect() as conn:
+            _execute_schema(conn)
+            conn.commit()
+        _schema_ready.add(key)
+
+
+def get_latest_event_id():
+    """Cheap 'did anything new get logged?' check used by the live push."""
+    init_db()
     with _connect() as conn:
-        _execute_schema(conn)
-        conn.commit()
+        row = conn.execute("SELECT MAX(id) AS m FROM events").fetchone()
+    if not row:
+        return 0
+    value = row["m"] if isinstance(row, dict) or hasattr(row, "keys") else row[0]
+    return int(value or 0)
 
 
 def utc_now():

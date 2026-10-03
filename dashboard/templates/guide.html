@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>System Guide - Barnafé Tech Smart Home System</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+<link rel="stylesheet" href="{{ static_v('css/theme.css') }}">
 <style>
   body{background:radial-gradient(1000px 500px at 85% -5%,rgba(8,70,150,.35),transparent 60%),var(--bg)}
   .top{position:sticky;top:0;z-index:30;background:rgba(0,18,45,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
@@ -101,7 +101,7 @@
 <body>
 
 <div class="top"><div class="in">
-  <a href="{{ url_for('home') }}"><img class="brand-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="Barnafé Tech Services"></a>
+  <a href="{{ url_for('home') }}"><img class="brand-logo" src="{{ static_v('img/logo.png') }}" alt="Barnafé Tech Services"></a>
   <nav>
     <a class="pill" href="{{ url_for('home') }}">🏠 Home</a>
     <a class="pill primary" href="{{ url_for('dashboard') }}">📊 Open Dashboard</a>
@@ -255,7 +255,7 @@
       <h2><span class="num">8</span>Get help</h2>
       <p class="lead">Need support or want a system like this? Reach out to us.</p>
       <div class="contact">
-        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Barnafé Tech Services">
+        <img src="{{ static_v('img/logo.png') }}" alt="Barnafé Tech Services">
         <ul>
           <li><b>WhatsApp</b> <a href="https://wa.me/2348085532197">08085532197</a></li>
           <li><b>Phone</b> <a href="tel:08145028220">08145028220</a></li>

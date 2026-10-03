@@ -287,3 +287,11 @@ never activates the global alarm or automated incident notification manager.
 - Every state change carries a strictly increasing `_v`; a device only ever applies a newer state, so simultaneous presses from several devices cannot leave screens disagreeing. The last press wins everywhere.
 - The siren "pim-pim" follows the server clock (`/api/time`), so all devices beep on the same second no matter when they joined. Browsers need one tap per device before they allow sound (a "Tap to enable alarm sound" button is shown until then).
 - Procfile now runs gunicorn with `--worker-class gthread --threads 64` so many devices can stay connected.
+
+### v17 - speed, mobile home page, reliability
+- Database: schema is created once per process (it used to run on every query), and PostgreSQL connections are pooled (`database._PooledPg`) instead of opened fresh for every read.
+- Pages are gzip-compressed, static files are cached for 30 days (changed files are picked up through `static_v`), the logo shrank from 280 KB to 11 KB.
+- `gunicorn.conf.py` forces the threaded worker, so the live screens of many devices can never block button presses, even if Render's Start Command is the old one.
+- Button presses are sent in order and retried automatically (3 tries) before any "not applied" message is shown.
+- The header clock shows the shared server time; phones that wake up re-sync the clock and state at once. `/healthz` is a database-free ping for an uptime monitor.
+- Phone home page shows the whole house picture, with nothing cut off.

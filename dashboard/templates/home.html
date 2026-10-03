@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Barnafé Tech Smart Home System</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+<link rel="stylesheet" href="{{ static_v('css/theme.css') }}">
 <style>
   body{min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden;
     background:
@@ -27,7 +27,7 @@
   /* hero */
   .hero{position:relative;flex:0 0 auto;min-height:450px}
   .hero-img{position:absolute;right:0;top:0;width:min(58%,820px);height:100%;
-    background:url('{{ url_for("static", filename="img/hero.jpg") }}') center/cover no-repeat;
+    background:url('{{ static_v("img/hero.jpg") }}') center/cover no-repeat;
     -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 38%),linear-gradient(0deg,transparent 0,#000 22%);
     -webkit-mask-composite:source-in;mask-image:linear-gradient(90deg,transparent 0,#000 38%),linear-gradient(0deg,transparent 0,#000 22%);
     mask-composite:intersect;}
@@ -84,10 +84,17 @@
     .tagline-nav{display:none}
     .nav{margin-left:auto}
     .topbar .wrap{height:74px}.topbar .brand-logo{height:50px}.nav .home{height:74px}
-    .hero-img{width:100%;opacity:.45;-webkit-mask-image:linear-gradient(0deg,transparent 0,#000 40%);mask-image:linear-gradient(0deg,transparent 0,#000 40%)}
-    .hero .wrap{padding-top:48px}
+    /* phones: show the WHOLE house picture (nothing cut off) under the title */
+    .hero{min-height:0;display:flex;flex-direction:column}
+    .hero .wrap{order:1}
+    .hero-img{order:2;position:relative;right:auto;top:auto;width:100%;height:auto;aspect-ratio:756/443;margin-top:6px;
+      background-size:100% 100%;
+      -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 90%,transparent 100%);
+      mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 90%,transparent 100%);
+      -webkit-mask-composite:source-over;mask-composite:add}
+    .hero .wrap{padding-top:36px;padding-bottom:0}
     .hello{font-size:24px}
-    .cards{grid-template-columns:1fr;gap:20px}
+    .cards{grid-template-columns:1fr;gap:20px;margin-top:0}
     .card{padding:20px;gap:16px}
     .card .ic{flex-basis:96px;height:96px}
     .guide-card .ic{flex-basis:80px;height:90px}
@@ -106,7 +113,7 @@
 
 <header class="topbar">
   <div class="wrap">
-    <img class="brand-logo" src="{{ url_for('static', filename='img/logo.png') }}" alt="Barnafé Tech Services">
+    <img class="brand-logo" src="{{ static_v('img/logo.png') }}" alt="Barnafé Tech Services">
     <nav class="nav">
       <a class="home" href="{{ url_for('home') }}">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 2 12h3v8h5v-5h4v5h5v-8h3z"/></svg>Home
@@ -130,7 +137,7 @@
 <main class="wrap">
   <div class="cards">
     <div class="card">
-      <div class="ic" style="background-image:url('{{ url_for('static', filename='img/icon-smarthome.jpg') }}')"></div>
+      <div class="ic" style="background-image:url('{{ static_v('img/icon-smarthome.jpg') }}')"></div>
       <div class="sep"></div>
       <div>
         <h3>What a Smart Home Does</h3>
@@ -140,7 +147,7 @@
     </div>
 
     <a class="card guide-card" href="{{ url_for('guide') }}" aria-label="How to Use - open the system guide">
-      <div class="ic" style="background-image:url('{{ url_for('static', filename='img/icon-guide.jpg') }}')"></div>
+      <div class="ic" style="background-image:url('{{ static_v('img/icon-guide.jpg') }}')"></div>
       <div class="sep"></div>
       <div style="flex:1">
         <h3>How to Use</h3>
