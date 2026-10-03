@@ -64,3 +64,4 @@ def test_healthz_gzip_and_static_cache():
 def test_phone_home_page_shows_whole_picture():
     html = Path("dashboard/templates/home.html").read_text(encoding="utf-8")
     assert "aspect-ratio:756/443" in html and "background-size:100% 100%" in html
+    assert ".hero{min-height:0;display:flex" not in html      # image stays behind the title, not in its own block
