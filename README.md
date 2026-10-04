@@ -295,3 +295,9 @@ never activates the global alarm or automated incident notification manager.
 - Button presses are sent in order and retried automatically (3 tries) before any "not applied" message is shown.
 - The header clock shows the shared server time; phones that wake up re-sync the clock and state at once. `/healthz` is a database-free ping for an uptime monitor.
 - Phone home page shows the whole house picture, with nothing cut off.
+
+
+### Dashboard declutter (v20)
+- Homeowner controls now live in a floating **Manual Control** button. It opens fully when the dashboard loads, folds to the screen edge as **Manual** on the first tap or scroll, can be dragged to the left or right edge (its place is remembered on that device), and opens the control panel as a popup that closes after any press.
+- The separate Incident History table was removed from the dashboard (Recent Activity and the History page remain).
+- The live camera feed is now the washed background of the Camera card.

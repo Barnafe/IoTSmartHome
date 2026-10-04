@@ -62,7 +62,7 @@
   .paused .tile.sense{opacity:.5}
 
   /* panels */
-  .main{display:grid;grid-template-columns:minmax(0,1fr) 410px;gap:16px;align-items:start}
+  .main{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:16px;align-items:start}
   .left{display:grid;gap:16px;min-width:0}.right{display:grid;gap:16px;min-width:0}
   .row2{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:16px}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;min-width:0}
@@ -70,10 +70,15 @@
   .panel h3 .r{margin-left:auto;text-transform:none;letter-spacing:0;font-size:12.5px;font-weight:600}
   .panel h3 a{color:var(--cyan);text-decoration:none}
 
-  .cam{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:16/10;background:#000 url('{{ static_v("img/hero.jpg") }}') center/cover}
-  .cam .live{position:absolute;top:10px;right:10px;background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:5px;letter-spacing:1px}
-  .cam .cap{position:absolute;left:0;right:0;bottom:0;padding:22px 12px 9px;background:linear-gradient(0deg,rgba(0,8,20,.9),transparent);font-size:12.5px;color:#fff}
-  .cam.paused-cam{filter:grayscale(1) brightness(.4)}
+  /* camera tile: the live feed sits under the card as a washed background */
+  .tile.camtile{position:relative;overflow:hidden;isolation:isolate}
+  .tile.camtile .cam{position:absolute;inset:0;z-index:-1;background:#000 url('{{ static_v("img/hero.jpg") }}') center/cover;opacity:.3;transition:filter .25s,opacity .25s}
+  .tile.camtile .cam:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(8,16,30,.35),rgba(8,16,30,.7))}
+  .tile.camtile .cam.paused-cam{filter:grayscale(1) brightness(.5)}
+  .camfoot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;color:var(--soft)}
+  .camfoot .cap{flex:1 1 auto;min-width:0}
+  .camfoot .live{background:var(--red);color:#fff;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:5px;letter-spacing:1px}
+  .camfoot .r{font-weight:700}
 
   .feed{list-style:none;margin:0;padding:0;display:grid;gap:4px}
   .feed li{display:flex;align-items:center;gap:11px;padding:8px 6px;border-radius:9px;min-width:0}
@@ -83,14 +88,7 @@
   .feed .ft span{font-size:12px;color:var(--muted)}.feed time{font-size:12px;color:var(--muted);white-space:nowrap;flex:0 0 auto}
   a.viewall{padding:5px 13px;border-radius:999px;border:1px solid var(--cyan);background:rgba(15,219,250,.08)}a.viewall:hover{background:var(--cyan);color:#001025}
   .feed li a.fl{display:flex;align-items:center;gap:11px;width:100%;color:inherit;text-decoration:none;min-width:0}
-  .inc tbody tr{cursor:pointer}.inc tbody tr:hover{background:rgba(15,219,250,.05)}
   .empty{color:var(--muted);font-size:13.5px;padding:14px 4px}
-
-  table.inc{width:100%;border-collapse:collapse;font-size:13px}
-  .inc th{text-align:left;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);font-size:12px}
-  .inc td{padding:9px 8px;border-bottom:1px solid rgba(11,45,82,.6);color:var(--soft);vertical-align:middle}
-  .inc td.ev{color:#fff;max-width:340px}
-  .chip{font-size:11.5px;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
 
   /* controls */
   .ctl{padding:12px 0;border-top:1px solid var(--line)}.ctl:first-of-type{border-top:0;padding-top:0}
@@ -111,6 +109,43 @@
   .utils button:hover{border-color:var(--amber);color:#fff}
   .utils button:disabled{opacity:.55;cursor:wait}
 
+
+  /* floating "Manual Control" button + popup */
+  .mc-fab{position:fixed;z-index:60;top:60%;display:flex;align-items:center;gap:0;height:48px;padding:0;border:1px solid rgba(15,219,250,.65);
+    border-radius:999px;background:linear-gradient(135deg,#0a8fd8,#0560b5);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;
+    box-shadow:0 6px 22px rgba(0,0,0,.45),0 0 18px rgba(15,219,250,.3);touch-action:none;user-select:none;-webkit-user-select:none;
+    transition:transform .35s cubic-bezier(.2,.8,.25,1),top .25s ease,left .25s ease,right .25s ease,opacity .2s}
+  .mc-fab.dragging{transition:none;cursor:grabbing}
+  .mc-fab .ico{width:46px;height:46px;flex:0 0 46px;display:grid;place-items:center}
+  .mc-fab .ico svg{width:23px;height:23px}
+  .mc-fab .lbl{white-space:nowrap;padding:0 4px 0 14px}
+  .mc-fab.dock-r{right:0;border-right:0;border-radius:999px 0 0 999px;flex-direction:row-reverse}
+  .mc-fab.dock-l{left:0;border-left:0;border-radius:0 999px 999px 0;flex-direction:row}
+  .mc-fab.dock-r .lbl{padding:0 0 0 16px}.mc-fab.dock-l .lbl{padding:0 16px 0 0}
+  .mc-fab .l-short{display:none}
+  .mc-fab.folded .l-full{display:none}.mc-fab.folded .l-short{display:inline}
+  .mc-fab.folded.dock-r{transform:translateX(23px)}
+  .mc-fab.folded.dock-l{transform:translateX(-23px)}
+  .mc-fab.folded{opacity:.92}
+  .mc-fab.gone{opacity:0;pointer-events:none}
+  .mc-fab:focus-visible{outline:2px solid #fff;outline-offset:2px}
+  .mc-pop{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:16px;visibility:hidden;opacity:0;transition:opacity .2s,visibility 0s .2s}
+  .mc-pop.open{visibility:visible;opacity:1;transition:opacity .2s}
+  .mc-back{position:absolute;inset:0;background:rgba(0,8,20,.66);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+  .mc-sheet{position:relative;width:min(460px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;
+    box-shadow:0 20px 60px rgba(0,0,0,.6),0 0 0 1px rgba(15,219,250,.25);transform:translateY(14px) scale(.97);transition:transform .22s cubic-bezier(.2,.8,.25,1)}
+  .mc-pop.open .mc-sheet{transform:none}
+  .mc-sheet h3{padding-right:38px}
+  .mc-x{position:absolute;top:12px;right:12px;width:32px;height:32px;border-radius:50%;border:1px solid var(--line2);background:var(--btn);color:var(--soft);font-size:16px;line-height:1;cursor:pointer;font-family:inherit}
+  .mc-x:hover{border-color:var(--cyan);color:#fff}
+  body.mc-lock{overflow:hidden}
+  @media (max-width:760px){
+    .mc-fab{height:44px}.mc-fab .ico{width:42px;height:42px;flex-basis:42px}.mc-fab{font-size:13px}
+    .mc-fab.folded.dock-r{transform:translateX(21px)}.mc-fab.folded.dock-l{transform:translateX(-21px)}
+    .mc-pop{align-items:end;padding:10px}.mc-sheet{max-height:calc(100dvh - 20px)}
+  }
+  @media (prefers-reduced-motion:reduce){.mc-fab,.mc-sheet,.mc-pop{transition:none}}
+
   .ov{display:grid;gap:2px}
   .ov div{display:flex;align-items:center;padding:8px 2px;border-bottom:1px solid rgba(11,45,82,.6);font-size:13.5px;color:var(--soft)}
   .ov div:last-child{border-bottom:0}.ov div b{margin-left:auto;font-weight:700;text-align:right}
@@ -130,7 +165,6 @@
     .tnav{order:3;width:100%;margin:0}.tright{gap:10px}.clock b{font-size:15px}.admin div{display:none}
     .row2{grid-template-columns:1fr}.welcome{grid-template-columns:1fr}
     .tiles{grid-template-columns:repeat(2,1fr);gap:9px}.tile{padding:11px 12px}.tile .val{font-size:17px}
-    .inc .loc{display:none}
     .tile .th{gap:7px}.tile .ic{width:28px;height:28px;flex-basis:28px;font-size:15px}
     .tile .nm{font-size:12px}.tile .badge{font-size:10px;padding:2px 7px}
   }
@@ -173,7 +207,8 @@
     <div class="tile sense" id="t-gate"><div class="th"><div class="ic">🚧</div><div class="nm">Gate</div><span class="badge" id="gate-badge"></span></div><div class="val" id="gate-value">-</div><div class="sub">Layer 1 · Gate sensor</div></div>
     <div class="tile sense" id="t-door"><div class="th"><div class="ic">🚪</div><div class="nm">Door</div><span class="badge" id="door-badge"></span></div><div class="val" id="door-value">-</div><div class="sub">Layer 2 · Door sensors</div></div>
     <div class="tile sense" id="t-occ"><div class="th"><div class="ic">🏠</div><div class="nm">Indoor / Room</div><span class="badge" id="occ-badge"></span></div><div class="val" id="occupancy-value">-</div><div class="sub">PIR motion detection</div></div>
-    <div class="tile sense" id="t-cam"><div class="th"><div class="ic">📷</div><div class="nm">Camera</div><span class="badge" id="cam-badge"></span></div><div class="val" id="camera-value">-</div><div class="sub" id="camera-status">-</div></div>
+    <div class="tile sense camtile" id="t-cam"><div class="cam" id="cam"></div><div class="th"><div class="ic">📷</div><div class="nm">Camera</div><span class="badge" id="cam-badge"></span></div><div class="val" id="camera-value">-</div><div class="sub" id="camera-status">-</div>
+      <div class="camfoot"><span class="cap">📹 Front View · Main Gate</span><span class="r g" id="feed-live">● Online</span><span class="live" id="cam-live">LIVE</span></div></div>
     <div class="tile sense" id="t-temp"><div class="th"><div class="ic">🌡️</div><div class="nm">Temperature</div><span class="badge" id="temp-badge"></span></div><div class="val" id="temp-value">-</div><div class="sub" id="temp-status">-</div></div>
     <div class="tile sense" id="t-gas"><div class="th"><div class="ic">🔥</div><div class="nm">Gas</div><span class="badge" id="gas-badge"></span></div><div class="val" id="gas-value">-</div><div class="sub" id="gas-status">-</div></div>
     <div class="tile" id="t-light"><div class="th"><div class="ic">💡</div><div class="nm">Lights</div><span class="badge" id="light-badge"></span></div><div class="val" id="light-value">-</div><div class="sub" id="light-status">-</div></div>
@@ -182,57 +217,13 @@
 
   <div class="main">
     <div class="left">
-      <div class="row2">
-        <div class="panel">
-          <h3>📹 Live Camera Feed <span class="r g" id="feed-live">● Online</span></h3>
-          <div class="cam" id="cam"><span class="live" id="cam-live">LIVE</span><div class="cap">Front View · Main Gate</div></div>
-        </div>
-        <div class="panel">
-          <h3>🕒 Recent Activity <span class="r"><a class="viewall" href="{{ url_for('history') }}">View All →</a></span></h3>
-          <ul class="feed" id="activity"><li class="empty">Loading activity…</li></ul>
-        </div>
-      </div>
       <div class="panel">
-        <h3>📋 Incident History <span class="r"><a class="viewall" href="{{ url_for('history') }}">View All →</a></span></h3>
-        <div style="overflow-x:auto">
-          <table class="inc"><thead><tr><th>Date &amp; Time</th><th>Event</th><th class="loc">Location</th><th>Status</th></tr></thead>
-          <tbody id="incidents"><tr><td colspan="4" class="empty">Loading incidents…</td></tr></tbody></table>
-        </div>
+        <h3>🕒 Recent Activity <span class="r"><a class="viewall" href="{{ url_for('history') }}">View All →</a></span></h3>
+        <ul class="feed" id="activity"><li class="empty">Loading activity…</li></ul>
       </div>
     </div>
 
     <div class="right">
-      <div class="panel" id="controls">
-        <h3>🎛️ Homeowner Controls</h3>
-        <p class="legend">↺ Normal = resume normal (automatic) mode</p>
-
-        <div class="ctl" data-device="light">
-          <div class="hd"><span class="ic">💡</span><b>Light</b><span class="st" id="st-light"></span></div>
-          <div class="btns"><button data-mode="ON">ON</button><button data-mode="OFF">OFF</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
-        </div>
-        <div class="ctl" data-device="gate">
-          <div class="hd"><span class="ic">🚧</span><b>Gate</b><span class="st" id="st-gate"></span></div>
-          <div class="btns"><button data-mode="OPEN">OPEN</button><button data-mode="CLOSED">CLOSE</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
-        </div>
-        <div class="ctl" data-device="door">
-          <div class="hd"><span class="ic">🚪</span><b>Door</b><span class="st" id="st-door"></span></div>
-          <div class="btns"><button data-mode="OPEN">OPEN</button><button data-mode="CLOSED">CLOSE</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
-        </div>
-        <div class="ctl" data-device="security">
-          <div class="hd"><span class="ic">🛡️</span><b>Security Mode</b><span class="st" id="st-security"></span></div>
-          <div class="btns"><button data-mode="ON">ON</button><button data-mode="OFF" class="offbtn">OFF</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
-        </div>
-        <div class="ctl" data-device="climate">
-          <div class="hd"><span class="ic">❄️</span><b>AC / Heater</b><span class="st" id="st-climate"></span></div>
-          <div class="btns"><button data-mode="AC">AC</button><button data-mode="HEATER">HEATER</button><button data-mode="OFF">OFF</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
-        </div>
-
-        <div class="utils">
-          <button id="silence-btn" type="button" data-url="{{ url_for('control_silence') }}">🔇 Silence Siren</button>
-          <button id="email-btn" type="button" data-url="{{ url_for('control_test_email') }}">📧 Send Test Email</button>
-        </div>
-      </div>
-
       <div class="panel">
         <h3>📈 System Overview</h3>
         <div class="ov">
@@ -251,6 +242,46 @@
 
   <div class="foot">Smart Home Automation System | By: Tavershima Aondoalough Barnabas | Barnafé Tech Services</div>
 </div>
+
+<div class="mc-pop" id="mc-pop" aria-hidden="true">
+  <div class="mc-back" id="mc-back"></div>
+  <div class="panel mc-sheet" id="controls" role="dialog" aria-modal="true" aria-labelledby="mc-title">
+    <button type="button" class="mc-x" id="mc-close" aria-label="Close">✕</button>
+    <h3 id="mc-title">🎛️ Manual Control</h3>
+    <p class="legend">↺ Normal = resume normal (automatic) mode</p>
+
+    <div class="ctl" data-device="light">
+      <div class="hd"><span class="ic">💡</span><b>Light</b><span class="st" id="st-light"></span></div>
+      <div class="btns"><button data-mode="ON">ON</button><button data-mode="OFF">OFF</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
+    </div>
+    <div class="ctl" data-device="gate">
+      <div class="hd"><span class="ic">🚧</span><b>Gate</b><span class="st" id="st-gate"></span></div>
+      <div class="btns"><button data-mode="OPEN">OPEN</button><button data-mode="CLOSED">CLOSE</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
+    </div>
+    <div class="ctl" data-device="door">
+      <div class="hd"><span class="ic">🚪</span><b>Door</b><span class="st" id="st-door"></span></div>
+      <div class="btns"><button data-mode="OPEN">OPEN</button><button data-mode="CLOSED">CLOSE</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
+    </div>
+    <div class="ctl" data-device="security">
+      <div class="hd"><span class="ic">🛡️</span><b>Security Mode</b><span class="st" id="st-security"></span></div>
+      <div class="btns"><button data-mode="ON">ON</button><button data-mode="OFF" class="offbtn">OFF</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
+    </div>
+    <div class="ctl" data-device="climate">
+      <div class="hd"><span class="ic">❄️</span><b>AC / Heater</b><span class="st" id="st-climate"></span></div>
+      <div class="btns"><button data-mode="AC">AC</button><button data-mode="HEATER">HEATER</button><button data-mode="OFF">OFF</button><button class="res" data-mode="AUTO" title="Resume normal" aria-label="Resume normal">↺ Normal</button></div>
+    </div>
+
+    <div class="utils">
+      <button id="silence-btn" type="button" data-url="{{ url_for('control_silence') }}">🔇 Silence Siren</button>
+      <button id="email-btn" type="button" data-url="{{ url_for('control_test_email') }}">📧 Send Test Email</button>
+    </div>
+  </div>
+</div>
+
+<button type="button" class="mc-fab dock-r" id="mc-fab" aria-haspopup="dialog" aria-expanded="false" aria-label="Open Manual Control">
+  <span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9M4 12h3M11 12h9"/><circle cx="15" cy="7" r="2" fill="currentColor"/><circle cx="9" cy="17" r="2" fill="currentColor"/><circle cx="9" cy="12" r="2" fill="currentColor"/></svg></span>
+  <span class="lbl"><span class="l-full">Manual Control</span><span class="l-short">Manual</span></span>
+</button>
 
 <div class="toast" id="toast"></div>
 
@@ -505,7 +536,7 @@
     setOv("ov-db", d.db_backend || "?");
   }
 
-  // ---- events: recent activity + incident history ----
+  // ---- events: recent activity ----
   const EVT = {
     security_breach:   ["🚨", "t-bad"],  security_clear: ["✅", "t-good"],
     camera_detection:  ["📷", "t-warn"], homeowner_control: ["🎛️", "t-info"],
@@ -514,10 +545,6 @@
   function when(iso) {
     const t = new Date(iso); if (isNaN(t)) return "";
     return t.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
-  }
-  function whenFull(iso) {
-    const t = new Date(iso); if (isNaN(t)) return "";
-    return t.toLocaleDateString([], {day:"2-digit", month:"short"}) + ", " + t.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
   }
   let loadingEvents = false;
   async function loadEvents() {
@@ -531,11 +558,6 @@
         return '<li><a class="fl" href="' + URLS.detail + e.id + '"><span class="fi ' + tn + '" style="border:0">' + ic + '</span><div class="ft"><b>' + esc(e.message) + '</b><span>' + esc(e.location || e.source) + '</span></div><time>' + when(e.created_at) + '</time></a></li>';
       }).join("");
       $("activity").innerHTML = act || '<li class="empty">No activity recorded yet.</li>';
-      const inc = ev.filter(e => e.severity === "critical" || e.severity === "warning").slice(0, 3).map(e => {
-        const crit = e.severity === "critical";
-        return '<tr onclick="location.href=\'' + URLS.detail + e.id + '\'"><td>' + whenFull(e.created_at) + '</td><td class="ev">' + esc(e.message) + '</td><td class="loc">' + esc(e.location || e.source) + '</td><td><span class="chip ' + (crit ? "t-bad" : "t-warn") + '">' + (crit ? "Critical" : "Warning") + '</span></td></tr>';
-      }).join("");
-      $("incidents").innerHTML = inc || '<tr><td colspan="4" class="empty">No incidents recorded. 🎉</td></tr>';
     } catch (e) {} finally { loadingEvents = false; }
   }
 
@@ -655,6 +677,100 @@
   }
   $("silence-btn").addEventListener("click", e => utility(e.currentTarget, "🔇 Silencing…"));
   $("email-btn").addEventListener("click", e => utility(e.currentTarget, "📧 Sending…"));
+
+
+  // ---- floating "Manual Control" button + popup ----
+  // Opens fully on arrival, tucks half-way into the screen edge as soon as the
+  // page is touched or scrolled, can be dragged to the left or right edge, and
+  // opens the control panel as a popup that folds away after any press.
+  (function () {
+    const fab = $("mc-fab"), pop = $("mc-pop");
+    if (!fab || !pop) return;
+    const KEY = "mc-fab-pos";
+    let side = "r", topPx = null, armed = false, startY = window.scrollY, dragged = false;
+    try { const p = JSON.parse(localStorage.getItem(KEY) || "null"); if (p) { side = p.side === "l" ? "l" : "r"; topPx = +p.top || null; } } catch (e) {}
+
+    function clampTop(t) {
+      const lo = 78, hi = Math.max(lo, window.innerHeight - fab.offsetHeight - 14);
+      return Math.min(hi, Math.max(lo, t));
+    }
+    function place() {
+      fab.classList.toggle("dock-l", side === "l"); fab.classList.toggle("dock-r", side !== "l");
+      fab.style.left = ""; fab.style.right = "";
+      fab.style.top = clampTop(topPx == null ? window.innerHeight * 0.6 : topPx) + "px";
+    }
+    function save() { try { localStorage.setItem(KEY, JSON.stringify({side: side, top: topPx})); } catch (e) {} }
+    function fold() { if (!pop.classList.contains("open")) fab.classList.add("folded"); }
+    function unfold() { fab.classList.remove("folded"); }
+
+    function open() {
+      pop.classList.add("open"); pop.setAttribute("aria-hidden", "false");
+      fab.setAttribute("aria-expanded", "true"); fab.classList.add("gone");
+      document.body.classList.add("mc-lock");
+    }
+    function close(refocus) {
+      if (!pop.classList.contains("open")) return;
+      pop.classList.remove("open"); pop.setAttribute("aria-hidden", "true");
+      fab.setAttribute("aria-expanded", "false"); fab.classList.remove("gone");
+      document.body.classList.remove("mc-lock");
+      fold();
+      if (refocus) { try { fab.focus({preventScroll: true}); } catch (e) {} }
+    }
+
+    // fold the first time the page is touched, clicked or scrolled
+    function firstUse(e) {
+      if (!armed || fab.classList.contains("folded")) return;
+      if (e && e.type === "scroll" && Math.abs(window.scrollY - startY) < 3) return;
+      if (e && e.target && fab.contains(e.target)) return;
+      fold();
+    }
+    setTimeout(() => { armed = true; startY = window.scrollY; }, 700);
+    ["pointerdown", "keydown"].forEach(t => document.addEventListener(t, firstUse, true));
+    ["scroll", "wheel", "touchmove"].forEach(t => window.addEventListener(t, firstUse, {passive: true}));
+
+    // drag to the left or right edge (never rests in the middle)
+    let drag = null;
+    fab.addEventListener("pointerdown", e => {
+      if (e.button !== undefined && e.button !== 0) return;
+      const r = fab.getBoundingClientRect();
+      drag = {x: e.clientX, y: e.clientY, top: r.top, left: r.left, moved: false, id: e.pointerId};
+      try { fab.setPointerCapture(e.pointerId); } catch (er) {}
+    });
+    fab.addEventListener("pointermove", e => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 7) return;
+      if (!drag.moved) { drag.moved = true; fab.classList.add("dragging"); unfold(); fab.style.right = "auto"; fab.style.transform = "none"; }
+      fab.style.left = Math.min(window.innerWidth - fab.offsetWidth, Math.max(0, drag.left + dx)) + "px";
+      fab.style.top = clampTop(drag.top + dy) + "px";
+    });
+    function endDrag(e) {
+      if (!drag || e.pointerId !== drag.id) return;
+      const was = drag; drag = null;
+      try { fab.releasePointerCapture(e.pointerId); } catch (er) {}
+      if (!was.moved) return;
+      dragged = true; setTimeout(() => { dragged = false; }, 60);
+      const r = fab.getBoundingClientRect();
+      side = (r.left + r.width / 2) < window.innerWidth / 2 ? "l" : "r";
+      topPx = clampTop(r.top);
+      fab.classList.remove("dragging"); fab.style.transform = "";
+      place(); save(); fold();
+    }
+    fab.addEventListener("pointerup", endDrag);
+    fab.addEventListener("pointercancel", endDrag);
+
+    fab.addEventListener("click", () => { if (dragged) return; open(); });
+    $("mc-close").addEventListener("click", () => close(true));
+    $("mc-back").addEventListener("click", () => close(true));
+    document.addEventListener("keydown", e => { if (e.key === "Escape") close(true); });
+    // pressing anything inside the panel applies it, then the popup folds away
+    $("controls").addEventListener("click", e => {
+      const b = e.target.closest("button");
+      if (b && b.id !== "mc-close") close(false);
+    });
+    window.addEventListener("resize", place);
+    place();
+  })();
 
   render(last);
   loadEvents();
