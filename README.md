@@ -274,7 +274,7 @@ never activates the global alarm or automated incident notification manager.
 
 ### Pages and homeowner controls (v13)
 - `/` Home page (Process -> dashboard, How to Use -> guide), `/dashboard` live dashboard, `/guide` system guide, `/history` event history.
-- Homeowner Controls (Light, Gate, Door, Security Mode, AC/Heater) each accept ON/OFF (or OPEN/CLOSE, AC/HEATER/OFF) and "Resume normal" (AUTO). They call `POST /control/<device>` with fetch(), so they respond instantly without reloading the page.
+- Homeowner Controls (Light, Gate, Door, Security Mode, AC/Heater) each accept ON/OFF (or OPEN/CLOSE, AC/HEATER/OFF) and "Auto" (AUTO, hands control back to the automatic system). They call `POST /control/<device>` with fetch(), so they respond instantly without reloading the page.
 - Security Mode OFF switches the entire system off at once: monitoring workers pause, any alarm is cleared, lights/AC/heater go off. "Force All Appliances OFF" and "Resume Automatic Mode" were removed.
 - Gate/Door OPEN is treated as authorised (never a breach). Manual modes are held in the shared state and reset to AUTO whenever the worker starts.
 

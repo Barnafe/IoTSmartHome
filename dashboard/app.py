@@ -330,7 +330,7 @@ _CONTROL_LABELS = {
              "CLOSED": "Door closed by homeowner.", "AUTO": "Door back to automatic monitoring."},
     "security": {"ON": "Security Mode ON - system armed.",
                  "OFF": "Security Mode OFF - the entire system is switched off.",
-                 "AUTO": "Security Mode back to normal - system armed."},
+                 "AUTO": "Security Mode set to Auto - system armed."},
     "climate": {"AC": "AC forced ON (weather ignored).", "HEATER": "Heater forced ON (weather ignored).",
                 "OFF": "AC and Heater both OFF.", "AUTO": "AC/Heater back to automatic (weather decides)."},
 }

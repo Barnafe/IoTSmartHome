@@ -75,7 +75,7 @@ def _save():
 
 
 
-# Homeowner controls. Every device accepts AUTO ("resume normal"), which hands
+# Homeowner controls. Every device accepts AUTO ("Auto", resume automatic control), which hands
 # the device back to the automatic system. Stored values are what the server keeps.
 CONTROL_MODES = {
     "light":    ("light_mode",    ("AUTO", "ON", "OFF")),
