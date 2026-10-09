@@ -76,7 +76,7 @@
   summary{cursor:pointer;padding:15px 18px;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:12px}
   summary::-webkit-details-marker{display:none}
   summary:after{content:"+";color:var(--cyan);font-size:22px;line-height:1}
-  details[open] summary:after{content:"–"}
+  details[open] summary:after{content:"\00D7"}
   details[open] summary{border-bottom:1px solid var(--line);color:var(--cyan)}
   details p{margin:0;padding:14px 18px;color:var(--soft);font-size:15px}
 
@@ -258,6 +258,7 @@
       <details><summary>The dashboard says the worker is OFFLINE</summary><p>The monitoring worker has stopped or has not reported for 30 seconds. Check that the worker service is running, then wait a few seconds for the heartbeat to return.</p></details>
       <details><summary>I pressed Security Mode OFF and the cards say PAUSED</summary><p>That is expected: the whole system is off. Open <b>Manual Control</b> and press <b>ON</b> or <b>Auto</b> on Security Mode to start it again.</p></details>
       <details><summary>I opened the gate but nothing sounded. Is it broken?</summary><p>No. A gate you open with the control is authorised, so it does not raise an alarm. Press <b>CLOSE</b> or <b>Auto</b> when done.</p></details>
+      <details><summary>The temperature is HIGH but the AC is still off</summary><p>Look at the <b>Indoor / Room</b> card. In Auto, the AC and heater only run when someone is home, so an <b>EMPTY</b> room keeps them off to save energy. The AC / Heater card says so ("Room empty: AC held off"). The moment the motion sensors see someone, the AC switches on. To cool the house regardless, open <b>Manual Control</b> and choose <b>AC</b>.</p></details>
       <details><summary>My lights did not change when it got dark</summary><p>Check whether Light shows a <b>Manual</b> tag. If it does, press <b>Auto</b> so the system can decide again.</p></details>
       <details><summary>The siren has no sound</summary><p>Tap or click anywhere on the page once, because browsers block sound until you interact. Also check that the siren has not been silenced and your device volume is up.</p></details>
       <details><summary>I did not receive the alert email</summary><p>Press <b>Send Test Email</b>. If it fails, the email service key or recipient address is not set correctly for the deployment.</p></details>

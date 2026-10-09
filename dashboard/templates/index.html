@@ -505,7 +505,14 @@
     tone($("light-badge"), !on ? "off" : d.light_mode !== "AUTO" ? "warn" : lightOn ? "good" : "info", !on ? "Paused" : d.light_mode !== "AUTO" ? "Manual" : "Auto");
     const acOn = d.ac_status === "ON", htOn = d.heater_status === "ON";
     $("ac-value").textContent = acOn ? "AC ON" : htOn ? "HEATER ON" : "BOTH OFF";
-    $("heater-value").textContent = (on && d.climate_mode !== "AUTO") ? "Manual: " + d.climate_mode : (on ? "Automatic (weather decides)" : "System OFF");
+    let climateWhy;
+    if (!on) climateWhy = "System OFF";
+    else if (d.climate_mode !== "AUTO") climateWhy = "Manual: " + d.climate_mode;
+    else if (!d.someone_home && (ts === "HIGH" || ts === "LOW")) climateWhy = "Room empty: " + (ts === "HIGH" ? "AC" : "heater") + " held off to save energy (temperature is " + ts.toLowerCase() + ")";
+    else if (acOn) climateWhy = "Automatic: temperature is high and someone is home";
+    else if (htOn) climateWhy = "Automatic: temperature is low and someone is home";
+    else climateWhy = "Automatic: temperature is comfortable";
+    $("heater-value").textContent = climateWhy;
     tone($("ac-badge"), !on ? "off" : d.climate_mode !== "AUTO" ? "warn" : (acOn || htOn) ? "good" : "info", !on ? "Paused" : d.climate_mode !== "AUTO" ? "Manual" : "Auto");
     $("t-gate").classList.toggle("bad", d.gate_status === "BREACH");
     $("t-door").classList.toggle("bad", String(d.door_status || "").startsWith("BREACH"));
